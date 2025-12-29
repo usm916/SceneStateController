@@ -1,0 +1,16 @@
+modules:
+  scene:
+    responsibility: [manage_scene, map_outputs]
+    must_not: [direct_motor_control]
+
+  ir:
+    responsibility: [receive_ir, decode_ir, emit_event]
+
+  led:
+    responsibility: [render_led_pattern, maintain_state]
+
+  elevator:
+    responsibility: [step_control, safety_check]
+
+  pi_link:
+    responsibility: [send_events, receive_commands]

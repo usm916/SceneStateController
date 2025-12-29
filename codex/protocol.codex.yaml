@@ -1,0 +1,8 @@
+protocol:
+  transport: usb_serial
+  framing: line
+  esp_to_pi:
+    SCENE: "SCENE {name}"
+    EV_STATE: "EV {state}"
+  pi_to_esp:
+    MOVE: "MOVE {target}"

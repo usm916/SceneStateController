@@ -1,0 +1,8 @@
+coding:
+  language: cpp
+  framework: arduino
+  comments: english_only
+  rules:
+    - event_driven
+    - no_delay_in_loop
+    - scene_state_separation

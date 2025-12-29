@@ -1,0 +1,6 @@
+project:
+  name: SceneStateController
+  target:
+    mcu: esp32
+    framework: arduino
+  description: Event-driven scene and state orchestration system.
