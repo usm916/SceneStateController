@@ -1,0 +1,13 @@
+codex:
+  description: >
+    SceneStateController integrated bundle: Arduino prototype + full codex constraints.
+  include:
+    - codex/system.codex.yaml
+    - codex/modules.codex.yaml
+    - codex/protocol.codex.yaml
+    - codex/coding.codex.yaml
+    - codex/runtime.codex.yaml
+  priority:
+    hardware: mandatory
+    protocol: mandatory
+    coding_rules: mandatory
