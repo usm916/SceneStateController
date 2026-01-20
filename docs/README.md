@@ -19,6 +19,7 @@ Set build flag or edit SSC_MODE in src/config.h:
 - 3: EV only
 - 4: Pi link only
 
+
 ## Wiring defaults
 IR OUT -> GPIO23
 WS2812B DATA -> GPIO18
