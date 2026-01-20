@@ -29,6 +29,17 @@ static void apply_led_override(uint8_t pattern_id) {
   }
 }
 
+#if SSC_IR_LOG_ENABLE
+static void log_ir_event(const Event &event) {
+  Serial.print("IR protocol=");
+  Serial.print(event.data.ir.protocol);
+  Serial.print(" addr=0x");
+  Serial.print(event.data.ir.addr, HEX);
+  Serial.print(" cmd=0x");
+  Serial.println(event.data.ir.cmd, HEX);
+}
+#endif
+
 void setup() {
   Serial.begin(115200);
   delay(1200);
@@ -64,6 +75,9 @@ void loop() {
   if (SSC_MODE == 0 || SSC_MODE == 1) {
     Event e;
     if (ir_poll(e)) {
+#if SSC_IR_LOG_ENABLE
+      if (SSC_MODE != 1) log_ir_event(e);
+#endif
       if (SSC_MODE == 1) {
         pi_link_send_event(e);
       } else {

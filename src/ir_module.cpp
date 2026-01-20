@@ -1,5 +1,4 @@
 #include "ir_module.h"
-#include "config.h"
 #include <IRremote.hpp>
 
 void ir_setup() {
