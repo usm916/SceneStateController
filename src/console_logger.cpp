@@ -15,11 +15,6 @@ void ConsoleLogger::print_banner() {
   out_.println("====================================================");
 }
 
-void ConsoleLogger::print_mode(uint8_t mode) {
-  out_.print("MODE ");
-  out_.println(mode);
-}
-
 void ConsoleLogger::print_mode_change(uint8_t before, uint8_t after) {
   out_.print("MODE CHANGED ");
   out_.print(before);
