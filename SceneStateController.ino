@@ -7,12 +7,11 @@
 #include "src/ir_module.h"
 #include "src/led_module.h"
 #include "src/pi_link.h"
+#include "src/serial_console.h"
 #include "src/scene_controller.h"
 #include "src/console_logger.h"
 
 static ConsoleLogger s_log(Serial);
-static char s_serial_line[24] = {0};
-static uint8_t s_serial_line_len = 0;
 
 static uint8_t s_runtime_mode = SSC_MODE;
 static bool s_ir_ready = false;
@@ -24,8 +23,6 @@ static void apply_led_override(uint8_t pattern_id);
 static bool mode_is(uint8_t mode);
 static void ensure_modules_for_mode(uint8_t mode);
 static void set_runtime_mode(uint8_t mode);
-static void handle_serial_line(const char* line, uint8_t len);
-static void poll_serial_console();
 
 static void apply_led_override(uint8_t pattern_id) {
   switch (pattern_id) {
@@ -69,40 +66,6 @@ static void set_runtime_mode(uint8_t mode) {
   s_log.print_mode_change(prev_mode, s_runtime_mode);
 }
 
-static void handle_serial_line(const char* line, uint8_t len) {
-  if (len == 2 && (line[0] == 's' || line[0] == 'S') && line[1] >= '0' && line[1] <= '4') {
-    set_runtime_mode((uint8_t)(line[1] - '0'));
-    return;
-  }
-  if (len == 1 && line[0] >= '0' && line[0] <= '3') {
-    ir_set_decode_mode((uint8_t)(line[0] - '0'));
-    return;
-  }
-  if (len >= sizeof(s_serial_line) - 1) {
-    s_log.print_mode_cmd_too_long();
-    return;
-  }
-  s_log.print_mode_usage();
-}
-
-static void poll_serial_console() {
-  while (Serial.available()) {
-    const char c = (char)Serial.read();
-    s_log.print_serial_echo(c);
-    if (c == '\r') continue;
-    if (c == '\n') {
-      handle_serial_line(s_serial_line, s_serial_line_len);
-      s_serial_line_len = 0;
-      s_serial_line[0] = '\0';
-      continue;
-    }
-    if (s_serial_line_len < sizeof(s_serial_line) - 1) {
-      s_serial_line[s_serial_line_len++] = c;
-      s_serial_line[s_serial_line_len] = '\0';
-    }
-  }
-}
-
 void setup() {
   Serial.begin(SSC_USB_SERIAL_BAUD);
   delay(1200);
@@ -116,7 +79,7 @@ void setup() {
 
 void loop() {
   const uint32_t now_ms = millis();
-  poll_serial_console();
+  serial_console_poll(s_log, set_runtime_mode);
 
   if (mode_is(4)) {
     Event e;
