@@ -133,6 +133,16 @@ static bool s_ir_ready = false;
 static bool s_led_ready = false;
 static bool s_elevator_ready = false;
 static bool s_scene_ready = false;
+static void print_banner() {
+  Serial.println();
+  Serial.println("===== SceneStateController (Arduino Prototype) =====");
+  Serial.print("Serial Monitor baud="); Serial.println(SSC_USB_SERIAL_BAUD);
+  Serial.print("SSC_MODE="); Serial.println(SSC_MODE);
+  Serial.println("Pi5 -> ESP32 commands:");
+  Serial.println("  MOVE <floor>");
+  Serial.println("  LED <pattern>  (0=IDLE 1=MOVING 2=ARRIVED 3=ERROR)");
+  Serial.println("====================================================");
+}
 
 static void apply_led_override(uint8_t pattern_id) {
   switch (pattern_id) {
