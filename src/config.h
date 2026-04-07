@@ -29,6 +29,10 @@
 #define SSC_IR_LOG_ENABLE 1
 #endif
 
+#ifndef SSC_USB_SERIAL_BAUD
+#define SSC_USB_SERIAL_BAUD 115200
+#endif
+
 
 // TMC2209 UART (added for UART switch)
 #define SSC_TMC_UART_BAUD 115200

@@ -33,7 +33,7 @@ Install (Arduino IDE Library Manager):
 - Set SSC_TMC_UART_RX_PIN / SSC_TMC_UART_TX_PIN accordingly
 
 ## 4. First boot check
-- Open Serial Monitor at 115200.
+- Open Serial Monitor at `SSC_USB_SERIAL_BAUD` (default 115200).
 - Confirm you see:
   - "SceneStateController (Arduino Prototype)"
   - "READY"
