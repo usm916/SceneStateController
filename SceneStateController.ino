@@ -23,6 +23,14 @@ class ModeCommandParser {
       }
 
       const char c = (char)io.read();
+      Serial.print("RX: ");
+      if (c == '\r') {
+        Serial.println("\\r");
+      } else if (c == '\n') {
+        Serial.println("\\n");
+      } else {
+        Serial.println(c);
+      }
       if (c == '\r') continue;
 
       if (c == '\n') {
@@ -149,6 +157,13 @@ static void poll_mode_switch_from_serial() {
   }
 }
 
+static void poll_unhandled_serial_echo() {
+  while (Serial.available()) {
+    const char c = (char)Serial.read();
+    s_log.print_serial_echo(c);
+  }
+}
+
 void setup() {
   Serial.begin(SSC_USB_SERIAL_BAUD);
   delay(1200);
@@ -164,6 +179,7 @@ void loop() {
   const uint32_t now_ms = millis();
   poll_mode_switch_from_serial();
   ir_poll_serial_command();
+  poll_unhandled_serial_echo();
 
   if (mode_is(4)) {
     Event e;

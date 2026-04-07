@@ -13,6 +13,7 @@ class ConsoleLogger {
   void print_banner();
   void print_mode(uint8_t mode);
   void print_mode_change(uint8_t before, uint8_t after);
+  void print_serial_echo(char c);
   void print_mode_usage();
   void print_mode_cmd_too_long();
   void print_startup(uint8_t mode);

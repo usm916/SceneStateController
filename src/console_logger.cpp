@@ -27,6 +27,20 @@ void ConsoleLogger::print_mode_change(uint8_t before, uint8_t after) {
   out_.println(after);
 }
 
+void ConsoleLogger::print_serial_echo(char c) {
+  out_.print("RX: ");
+  if (c == '\r') {
+    out_.println("\\r");
+    return;
+  }
+  if (c == '\n') {
+    out_.println("\\n");
+    return;
+  }
+  out_.write((uint8_t)c);
+  out_.println();
+}
+
 void ConsoleLogger::print_mode_usage() {
   out_.println("MODE_CMD usage: s0..s4");
 }
