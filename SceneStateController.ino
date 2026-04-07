@@ -12,6 +12,7 @@
 static void print_banner() {
   Serial.println();
   Serial.println("===== SceneStateController (Arduino Prototype) =====");
+  Serial.print("Serial Monitor baud="); Serial.println(SSC_USB_SERIAL_BAUD);
   Serial.print("SSC_MODE="); Serial.println(SSC_MODE);
   Serial.println("Pi5 -> ESP32 commands:");
   Serial.println("  MOVE <floor>");
@@ -118,7 +119,7 @@ static void log_ir_event(const Event &event) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SSC_USB_SERIAL_BAUD);
   delay(1200);
   print_banner();
 
