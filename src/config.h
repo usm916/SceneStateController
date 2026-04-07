@@ -26,7 +26,7 @@
 #endif
 
 #ifndef SSC_IR_LOG_ENABLE
-#define SSC_IR_LOG_ENABLE 0
+#define SSC_IR_LOG_ENABLE 1
 #endif
 
 
