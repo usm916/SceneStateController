@@ -3,12 +3,136 @@
 #include "src/config.h"
 #include "src/events.h"
 
+#include "src/elevator_module.h"
 #include "src/ir_module.h"
 #include "src/led_module.h"
-#include "src/elevator_module.h"
 #include "src/pi_link.h"
 #include "src/scene_controller.h"
 
+class ConsoleLogger {
+ public:
+  explicit ConsoleLogger(Stream& out) : out_(out) {}
+
+  void print_banner() {
+    out_.println();
+    out_.println("===== SceneStateController (Arduino Prototype) =====");
+    out_.print("Serial Monitor baud=");
+    out_.println(SSC_USB_SERIAL_BAUD);
+    out_.print("SSC_MODE=");
+    out_.println(SSC_MODE);
+    out_.println("Pi5 -> ESP32 commands:");
+    out_.println("  MOVE <floor>");
+    out_.println("  LED <pattern>  (0=IDLE 1=MOVING 2=ARRIVED 3=ERROR)");
+    out_.println("====================================================");
+  }
+
+  void print_mode(uint8_t mode) {
+    out_.print("MODE ");
+    out_.println(mode);
+  }
+
+  void print_mode_usage() {
+    out_.println("MODE_CMD usage: s0..s4");
+  }
+
+  void print_mode_cmd_too_long() {
+    out_.println("MODE_CMD too long");
+  }
+
+  void print_startup(uint8_t mode) {
+    out_.print("INITIAL MODE=");
+    out_.println(mode);
+    out_.println("Type s0..s4 + Enter to switch mode at runtime.");
+    out_.println("READY");
+  }
+
+#if SSC_IR_LOG_ENABLE
+  void print_ir_event(const Event& event) {
+    out_.print("IR RX protocol=");
+    out_.print(event.data.ir.protocol);
+    out_.print(" addr=0x");
+    out_.print(event.data.ir.addr, HEX);
+    out_.print(" cmd=0x");
+    out_.println(event.data.ir.cmd, HEX);
+  }
+#endif
+
+ private:
+  Stream& out_;
+};
+
+class ModeCommandParser {
+ public:
+  bool poll(Stream& io, uint8_t* out_mode) {
+    while (io.available()) {
+      const char p = (char)io.peek();
+      if (!capturing_) {
+        if (p != 's' && p != 'S') return false;
+        capturing_ = true;
+        len_ = 0;
+      }
+
+      const char c = (char)io.read();
+      if (c == '\r') continue;
+
+      if (c == '\n') {
+        buf_[len_] = '\0';
+        capturing_ = false;
+
+        const bool valid =
+            (len_ == 2) &&
+            (buf_[0] == 's' || buf_[0] == 'S') &&
+            (buf_[1] >= '0' && buf_[1] <= '4');
+        len_ = 0;
+
+        if (valid) {
+          *out_mode = (uint8_t)(buf_[1] - '0');
+          return true;
+        }
+        invalid_ = true;
+        return false;
+      }
+
+      if (len_ < sizeof(buf_) - 1) {
+        buf_[len_++] = c;
+      } else {
+        capturing_ = false;
+        len_ = 0;
+        too_long_ = true;
+        return false;
+      }
+    }
+    return false;
+  }
+
+  bool consume_too_long() {
+    const bool v = too_long_;
+    too_long_ = false;
+    return v;
+  }
+
+  bool consume_invalid() {
+    const bool v = invalid_;
+    invalid_ = false;
+    return v;
+  }
+
+ private:
+  char buf_[16] = {0};
+  uint8_t len_ = 0;
+  bool capturing_ = false;
+  bool too_long_ = false;
+  bool invalid_ = false;
+};
+
+static ConsoleLogger s_log(Serial);
+static ModeCommandParser s_mode_parser;
+
+static uint8_t s_runtime_mode = SSC_MODE;
+static bool s_ir_ready = false;
+static bool s_led_ready = false;
+static bool s_elevator_ready = false;
+static bool s_scene_ready = false;
 static void print_banner() {
   Serial.println();
   Serial.println("===== SceneStateController (Arduino Prototype) =====");
@@ -29,12 +153,6 @@ static void apply_led_override(uint8_t pattern_id) {
     default: break;
   }
 }
-
-static uint8_t s_runtime_mode = SSC_MODE;
-static bool s_ir_ready = false;
-static bool s_led_ready = false;
-static bool s_elevator_ready = false;
-static bool s_scene_ready = false;
 
 static bool mode_is(uint8_t mode) {
   return s_runtime_mode == 0 || s_runtime_mode == mode;
@@ -64,73 +182,33 @@ static void set_runtime_mode(uint8_t mode) {
   s_runtime_mode = mode;
   ensure_modules_for_mode(mode);
   if (mode == 0) scene_setup();
-  Serial.print("MODE ");
-  Serial.println(s_runtime_mode);
+  s_log.print_mode(s_runtime_mode);
 }
 
 static void poll_mode_switch_from_serial() {
-  static char s_cmd_buf[16];
-  static uint8_t s_cmd_len = 0;
-  static bool s_capturing = false;
-
-  while (Serial.available()) {
-    const char p = (char)Serial.peek();
-    if (!s_capturing) {
-      if (p != 's' && p != 'S') return;
-      s_capturing = true;
-      s_cmd_len = 0;
-    }
-
-    const char c = (char)Serial.read();
-    if (c == '\r') continue;
-
-    if (c == '\n') {
-      s_cmd_buf[s_cmd_len] = '\0';
-      s_capturing = false;
-
-      if ((s_cmd_len == 2) && (s_cmd_buf[0] == 's' || s_cmd_buf[0] == 'S') && (s_cmd_buf[1] >= '0' && s_cmd_buf[1] <= '4')) {
-        set_runtime_mode((uint8_t)(s_cmd_buf[1] - '0'));
-      } else {
-        Serial.println("MODE_CMD usage: s0..s4");
-      }
-      s_cmd_len = 0;
-      return;
-    }
-
-    if (s_cmd_len < sizeof(s_cmd_buf) - 1) {
-      s_cmd_buf[s_cmd_len++] = c;
-    } else {
-      s_capturing = false;
-      s_cmd_len = 0;
-      Serial.println("MODE_CMD too long");
-      return;
-    }
+  uint8_t mode = 0;
+  if (s_mode_parser.poll(Serial, &mode)) {
+    set_runtime_mode(mode);
+    return;
   }
-}
-
-#if SSC_IR_LOG_ENABLE
-static void log_ir_event(const Event &event) {
-  Serial.print("IR RX protocol=");
-  Serial.print(event.data.ir.protocol);
-  Serial.print(" addr=0x");
-  Serial.print(event.data.ir.addr, HEX);
-  Serial.print(" cmd=0x");
-  Serial.println(event.data.ir.cmd, HEX);
+  if (s_mode_parser.consume_too_long()) {
+    s_log.print_mode_cmd_too_long();
+    return;
+  }
+  if (s_mode_parser.consume_invalid()) {
+    s_log.print_mode_usage();
+  }
 }
 
 void setup() {
   Serial.begin(SSC_USB_SERIAL_BAUD);
   delay(1200);
-  print_banner();
+  s_log.print_banner();
 
   pi_link_setup();
   s_runtime_mode = SSC_MODE;
   ensure_modules_for_mode(s_runtime_mode);
-
-  Serial.print("INITIAL MODE=");
-  Serial.println(s_runtime_mode);
-  Serial.println("Type s0..s4 + Enter to switch mode at runtime.");
-  Serial.println("READY");
+  s_log.print_startup(s_runtime_mode);
 }
 
 void loop() {
@@ -138,7 +216,6 @@ void loop() {
   poll_mode_switch_from_serial();
   ir_poll_serial_command();
 
-  // Pi link
   if (mode_is(4)) {
     Event e;
     if (pi_link_poll(e)) {
@@ -151,12 +228,11 @@ void loop() {
     }
   }
 
-  // IR
   if (mode_is(1)) {
     Event e;
     if (ir_poll(e)) {
 #if SSC_IR_LOG_ENABLE
-      log_ir_event(e);
+      s_log.print_ir_event(e);
 #endif
       if (s_runtime_mode == 1) {
         pi_link_send_event(e);
@@ -166,22 +242,22 @@ void loop() {
     }
   }
 
-  // Elevator
   if (mode_is(3)) {
     Event ev_e;
     elevator_tick(now_ms, &ev_e);
     if (ev_e.type != EVT_NONE) {
-      if (s_runtime_mode == 3) pi_link_send_event(ev_e);
-      else scene_handle_event(ev_e);
+      if (s_runtime_mode == 3) {
+        pi_link_send_event(ev_e);
+      } else {
+        scene_handle_event(ev_e);
+      }
     }
   }
 
-  // LED tick
   if (mode_is(2)) {
     led_tick(now_ms);
   }
 
-  // Scene tick
   if (s_runtime_mode == 0) {
     scene_tick(now_ms);
   }
