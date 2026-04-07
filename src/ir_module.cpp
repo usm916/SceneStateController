@@ -45,6 +45,14 @@ static void print_menu() {
   Serial.println("======================");
 }
 
+void ir_set_decode_mode(uint8_t mode) {
+  if (mode > 3) return;
+  s_decode_mode = mode;
+  Serial.print("Mode set to: ");
+  Serial.println(mode_name(s_decode_mode));
+  print_menu();
+}
+
 void ir_poll_serial_command() {
   if (!Serial.available()) return;
   const char p = (char)Serial.peek();
@@ -62,10 +70,7 @@ void ir_poll_serial_command() {
     }
   }
 
-  s_decode_mode = (uint8_t)(c - '0');
-  Serial.print("Mode set to: ");
-  Serial.println(mode_name(s_decode_mode));
-  print_menu();
+  ir_set_decode_mode((uint8_t)(c - '0'));
 }
 
 void ir_setup() {

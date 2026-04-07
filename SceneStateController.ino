@@ -88,7 +88,8 @@ class ModeCommandParser {
 };
 
 static ConsoleLogger s_log(Serial);
-static ModeCommandParser s_mode_parser;
+static char s_serial_line[24] = {0};
+static uint8_t s_serial_line_len = 0;
 
 static uint8_t s_runtime_mode = SSC_MODE;
 static bool s_ir_ready = false;
@@ -137,6 +138,13 @@ static void set_runtime_mode(uint8_t mode) {
   s_log.print_mode_change(prev_mode, s_runtime_mode);
 }
 
+static void handle_serial_line(const char* line, uint8_t len) {
+  if (len == 2 && (line[0] == 's' || line[0] == 'S') && line[1] >= '0' && line[1] <= '4') {
+    set_runtime_mode((uint8_t)(line[1] - '0'));
+    return;
+  }
+  if (len == 1 && line[0] >= '0' && line[0] <= '3') {
+    ir_set_decode_mode((uint8_t)(line[0] - '0'));
 static void poll_mode_switch_from_serial() {
   if (!Serial.available()) return;
 
@@ -148,12 +156,28 @@ static void poll_mode_switch_from_serial() {
     set_runtime_mode(mode);
     return;
   }
-  if (s_mode_parser.consume_too_long()) {
+  if (len >= sizeof(s_serial_line) - 1) {
     s_log.print_mode_cmd_too_long();
     return;
   }
-  if (s_mode_parser.consume_invalid()) {
-    s_log.print_mode_usage();
+  s_log.print_mode_usage();
+}
+
+static void poll_serial_console() {
+  while (Serial.available()) {
+    const char c = (char)Serial.read();
+    s_log.print_serial_echo(c);
+    if (c == '\r') continue;
+    if (c == '\n') {
+      handle_serial_line(s_serial_line, s_serial_line_len);
+      s_serial_line_len = 0;
+      s_serial_line[0] = '\0';
+      continue;
+    }
+    if (s_serial_line_len < sizeof(s_serial_line) - 1) {
+      s_serial_line[s_serial_line_len++] = c;
+      s_serial_line[s_serial_line_len] = '\0';
+    }
   }
 }
 
@@ -177,6 +201,7 @@ void setup() {
 
 void loop() {
   const uint32_t now_ms = millis();
+  poll_serial_console();
   poll_mode_switch_from_serial();
   ir_poll_serial_command();
   poll_unhandled_serial_echo();
