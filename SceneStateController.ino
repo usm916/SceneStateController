@@ -107,6 +107,16 @@ static void poll_mode_switch_from_serial() {
   }
 }
 
+#if SSC_IR_LOG_ENABLE
+static void log_ir_event(const Event &event) {
+  Serial.print("IR RX protocol=");
+  Serial.print(event.data.ir.protocol);
+  Serial.print(" addr=0x");
+  Serial.print(event.data.ir.addr, HEX);
+  Serial.print(" cmd=0x");
+  Serial.println(event.data.ir.cmd, HEX);
+}
+
 void setup() {
   Serial.begin(115200);
   delay(1200);
@@ -144,6 +154,9 @@ void loop() {
   if (mode_is(1)) {
     Event e;
     if (ir_poll(e)) {
+#if SSC_IR_LOG_ENABLE
+      log_ir_event(e);
+#endif
       if (s_runtime_mode == 1) {
         pi_link_send_event(e);
       } else {
