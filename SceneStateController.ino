@@ -8,142 +8,17 @@
 #include "src/led_module.h"
 #include "src/pi_link.h"
 #include "src/scene_controller.h"
-
-class ConsoleLogger {
- public:
-  explicit ConsoleLogger(Stream& out) : out_(out) {}
-
-  void print_banner() {
-    out_.println();
-    out_.println("===== SceneStateController (Arduino Prototype) =====");
-    out_.print("Serial Monitor baud=");
-    out_.println(SSC_USB_SERIAL_BAUD);
-    out_.print("SSC_MODE=");
-    out_.println(SSC_MODE);
-    out_.println("Pi5 -> ESP32 commands:");
-    out_.println("  MOVE <floor>");
-    out_.println("  LED <pattern>  (0=IDLE 1=MOVING 2=ARRIVED 3=ERROR)");
-    out_.println("====================================================");
-  }
-
-  void print_mode(uint8_t mode) {
-    out_.print("MODE ");
-    out_.println(mode);
-  }
-
-  void print_mode_usage() {
-    out_.println("MODE_CMD usage: s0..s4");
-  }
-
-  void print_mode_cmd_too_long() {
-    out_.println("MODE_CMD too long");
-  }
-
-  void print_startup(uint8_t mode) {
-    out_.print("INITIAL MODE=");
-    out_.println(mode);
-    out_.println("Type s0..s4 + Enter to switch mode at runtime.");
-    out_.println("READY");
-  }
-
-#if SSC_IR_LOG_ENABLE
-  void print_ir_event(const Event& event) {
-    out_.print("IR RX protocol=");
-    out_.print(event.data.ir.protocol);
-    out_.print(" addr=0x");
-    out_.print(event.data.ir.addr, HEX);
-    out_.print(" cmd=0x");
-    out_.println(event.data.ir.cmd, HEX);
-  }
-#endif
-
- private:
-  Stream& out_;
-};
-
-class ModeCommandParser {
- public:
-  bool poll(Stream& io, uint8_t* out_mode) {
-    while (io.available()) {
-      const char p = (char)io.peek();
-      if (!capturing_) {
-        if (p != 's' && p != 'S') return false;
-        capturing_ = true;
-        len_ = 0;
-      }
-
-      const char c = (char)io.read();
-      if (c == '\r') continue;
-
-      if (c == '\n') {
-        buf_[len_] = '\0';
-        capturing_ = false;
-
-        const bool valid =
-            (len_ == 2) &&
-            (buf_[0] == 's' || buf_[0] == 'S') &&
-            (buf_[1] >= '0' && buf_[1] <= '4');
-        len_ = 0;
-
-        if (valid) {
-          *out_mode = (uint8_t)(buf_[1] - '0');
-          return true;
-        }
-        invalid_ = true;
-        return false;
-      }
-
-      if (len_ < sizeof(buf_) - 1) {
-        buf_[len_++] = c;
-      } else {
-        capturing_ = false;
-        len_ = 0;
-        too_long_ = true;
-        return false;
-      }
-    }
-    return false;
-  }
-
-  bool consume_too_long() {
-    const bool v = too_long_;
-    too_long_ = false;
-    return v;
-  }
-
-  bool consume_invalid() {
-    const bool v = invalid_;
-    invalid_ = false;
-    return v;
-  }
-
- private:
-  char buf_[16] = {0};
-  uint8_t len_ = 0;
-  bool capturing_ = false;
-  bool too_long_ = false;
-  bool invalid_ = false;
-};
+#include "src/console_logger.h"
 
 static ConsoleLogger s_log(Serial);
-static ModeCommandParser s_mode_parser;
+static char s_serial_line[24] = {0};
+static uint8_t s_serial_line_len = 0;
 
 static uint8_t s_runtime_mode = SSC_MODE;
 static bool s_ir_ready = false;
 static bool s_led_ready = false;
 static bool s_elevator_ready = false;
 static bool s_scene_ready = false;
-static void print_banner() {
-  Serial.println();
-  Serial.println("===== SceneStateController (Arduino Prototype) =====");
-  Serial.print("Serial Monitor baud="); Serial.println(SSC_USB_SERIAL_BAUD);
-  Serial.print("SSC_MODE="); Serial.println(SSC_MODE);
-  Serial.println("Pi5 -> ESP32 commands:");
-  Serial.println("  MOVE <floor>");
-  Serial.println("  LED <pattern>  (0=IDLE 1=MOVING 2=ARRIVED 3=ERROR)");
-  Serial.println("====================================================");
-}
-
 static void apply_led_override(uint8_t pattern_id) {
   switch (pattern_id) {
     case 0: led_set_pattern(LEDP_IDLE); break;
@@ -179,24 +54,44 @@ static void ensure_modules_for_mode(uint8_t mode) {
 
 static void set_runtime_mode(uint8_t mode) {
   if (mode > 4) return;
+  const uint8_t prev_mode = s_runtime_mode;
   s_runtime_mode = mode;
   ensure_modules_for_mode(mode);
   if (mode == 0) scene_setup();
-  s_log.print_mode(s_runtime_mode);
+  s_log.print_mode_change(prev_mode, s_runtime_mode);
 }
 
-static void poll_mode_switch_from_serial() {
-  uint8_t mode = 0;
-  if (s_mode_parser.poll(Serial, &mode)) {
-    set_runtime_mode(mode);
+static void handle_serial_line(const char* line, uint8_t len) {
+  if (len == 2 && (line[0] == 's' || line[0] == 'S') && line[1] >= '0' && line[1] <= '4') {
+    set_runtime_mode((uint8_t)(line[1] - '0'));
     return;
   }
-  if (s_mode_parser.consume_too_long()) {
+  if (len == 1 && line[0] >= '0' && line[0] <= '3') {
+    ir_set_decode_mode((uint8_t)(line[0] - '0'));
+    return;
+  }
+  if (len >= sizeof(s_serial_line) - 1) {
     s_log.print_mode_cmd_too_long();
     return;
   }
-  if (s_mode_parser.consume_invalid()) {
-    s_log.print_mode_usage();
+  s_log.print_mode_usage();
+}
+
+static void poll_serial_console() {
+  while (Serial.available()) {
+    const char c = (char)Serial.read();
+    s_log.print_serial_echo(c);
+    if (c == '\r') continue;
+    if (c == '\n') {
+      handle_serial_line(s_serial_line, s_serial_line_len);
+      s_serial_line_len = 0;
+      s_serial_line[0] = '\0';
+      continue;
+    }
+    if (s_serial_line_len < sizeof(s_serial_line) - 1) {
+      s_serial_line[s_serial_line_len++] = c;
+      s_serial_line[s_serial_line_len] = '\0';
+    }
   }
 }
 
@@ -213,8 +108,7 @@ void setup() {
 
 void loop() {
   const uint32_t now_ms = millis();
-  poll_mode_switch_from_serial();
-  ir_poll_serial_command();
+  poll_serial_console();
 
   if (mode_is(4)) {
     Event e;
