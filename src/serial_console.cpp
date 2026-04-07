@@ -7,6 +7,11 @@ namespace {
 char s_serial_line[24] = {0};
 uint8_t s_serial_line_len = 0;
 
+void clear_serial_line() {
+  s_serial_line_len = 0;
+  s_serial_line[0] = '\0';
+}
+
 void handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
                         void (*set_runtime_mode_fn)(uint8_t)) {
   if (len == 2 && (line[0] == 's' || line[0] == 'S') && line[1] >= '0' && line[1] <= '4') {
@@ -32,13 +37,24 @@ void serial_console_poll(ConsoleLogger& log, void (*set_runtime_mode_fn)(uint8_t
     if (c == '\r') continue;
     if (c == '\n') {
       handle_serial_line(log, s_serial_line, s_serial_line_len, set_runtime_mode_fn);
-      s_serial_line_len = 0;
-      s_serial_line[0] = '\0';
+      clear_serial_line();
       continue;
     }
     if (s_serial_line_len < sizeof(s_serial_line) - 1) {
       s_serial_line[s_serial_line_len++] = c;
       s_serial_line[s_serial_line_len] = '\0';
+
+      if (s_serial_line_len == 1 && s_serial_line[0] >= '0' && s_serial_line[0] <= '3') {
+        handle_serial_line(log, s_serial_line, s_serial_line_len, set_runtime_mode_fn);
+        clear_serial_line();
+        continue;
+      }
+      if (s_serial_line_len == 2 &&
+          (s_serial_line[0] == 's' || s_serial_line[0] == 'S') &&
+          s_serial_line[1] >= '0' && s_serial_line[1] <= '4') {
+        handle_serial_line(log, s_serial_line, s_serial_line_len, set_runtime_mode_fn);
+        clear_serial_line();
+      }
     }
   }
 }

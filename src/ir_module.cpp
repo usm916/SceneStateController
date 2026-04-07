@@ -53,26 +53,6 @@ void ir_set_decode_mode(uint8_t mode) {
   print_menu();
 }
 
-void ir_poll_serial_command() {
-  if (!Serial.available()) return;
-  const char p = (char)Serial.peek();
-  if (p < '0' || p > '3') return;
-
-  const char c = (char)Serial.read();
-  Serial.print("RX: ");
-  Serial.println(c);
-  while (Serial.available()) {
-    const char t = (char)Serial.peek();
-    if (t == '\r' || t == '\n') {
-      (void)Serial.read();
-    } else {
-      break;
-    }
-  }
-
-  ir_set_decode_mode((uint8_t)(c - '0'));
-}
-
 void ir_setup() {
   IrReceiver.begin(SSC_PIN_IR, DISABLE_LED_FEEDBACK);
   Serial.println();
