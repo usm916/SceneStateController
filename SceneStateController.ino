@@ -116,7 +116,6 @@ static void log_ir_event(const Event &event) {
   Serial.print(" cmd=0x");
   Serial.println(event.data.ir.cmd, HEX);
 }
-#endif
 
 void setup() {
   Serial.begin(115200);
@@ -136,6 +135,7 @@ void setup() {
 void loop() {
   const uint32_t now_ms = millis();
   poll_mode_switch_from_serial();
+  ir_poll_serial_command();
 
   // Pi link
   if (mode_is(4)) {
