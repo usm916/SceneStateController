@@ -8,58 +8,8 @@
 #include "src/led_module.h"
 #include "src/pi_link.h"
 #include "src/scene_controller.h"
+#include "src/console_logger.h"
 
-class ConsoleLogger {
- public:
-  explicit ConsoleLogger(Stream& out) : out_(out) {}
-
-  void print_banner() {
-    out_.println();
-    out_.println("===== SceneStateController (Arduino Prototype) =====");
-    out_.print("Serial Monitor baud=");
-    out_.println(SSC_USB_SERIAL_BAUD);
-    out_.print("SSC_MODE=");
-    out_.println(SSC_MODE);
-    out_.println("Pi5 -> ESP32 commands:");
-    out_.println("  MOVE <floor>");
-    out_.println("  LED <pattern>  (0=IDLE 1=MOVING 2=ARRIVED 3=ERROR)");
-    out_.println("====================================================");
-  }
-
-  void print_mode(uint8_t mode) {
-    out_.print("MODE ");
-    out_.println(mode);
-  }
-
-  void print_mode_usage() {
-    out_.println("MODE_CMD usage: s0..s4");
-  }
-
-  void print_mode_cmd_too_long() {
-    out_.println("MODE_CMD too long");
-  }
-
-  void print_startup(uint8_t mode) {
-    out_.print("INITIAL MODE=");
-    out_.println(mode);
-    out_.println("Type s0..s4 + Enter to switch mode at runtime.");
-    out_.println("READY");
-  }
-
-#if SSC_IR_LOG_ENABLE
-  void print_ir_event(const Event& event) {
-    out_.print("IR RX protocol=");
-    out_.print(event.data.ir.protocol);
-    out_.print(" addr=0x");
-    out_.print(event.data.ir.addr, HEX);
-    out_.print(" cmd=0x");
-    out_.println(event.data.ir.cmd, HEX);
-  }
-#endif
-
- private:
-  Stream& out_;
-};
 
 class ModeCommandParser {
  public:
@@ -73,6 +23,14 @@ class ModeCommandParser {
       }
 
       const char c = (char)io.read();
+      Serial.print("RX: ");
+      if (c == '\r') {
+        Serial.println("\\r");
+      } else if (c == '\n') {
+        Serial.println("\\n");
+      } else {
+        Serial.println(c);
+      }
       if (c == '\r') continue;
 
       if (c == '\n') {
@@ -117,6 +75,10 @@ class ModeCommandParser {
     return v;
   }
 
+  bool is_capturing() const {
+    return capturing_;
+  }
+
  private:
   char buf_[16] = {0};
   uint8_t len_ = 0;
@@ -133,17 +95,6 @@ static bool s_ir_ready = false;
 static bool s_led_ready = false;
 static bool s_elevator_ready = false;
 static bool s_scene_ready = false;
-static void print_banner() {
-  Serial.println();
-  Serial.println("===== SceneStateController (Arduino Prototype) =====");
-  Serial.print("Serial Monitor baud="); Serial.println(SSC_USB_SERIAL_BAUD);
-  Serial.print("SSC_MODE="); Serial.println(SSC_MODE);
-  Serial.println("Pi5 -> ESP32 commands:");
-  Serial.println("  MOVE <floor>");
-  Serial.println("  LED <pattern>  (0=IDLE 1=MOVING 2=ARRIVED 3=ERROR)");
-  Serial.println("====================================================");
-}
-
 static void apply_led_override(uint8_t pattern_id) {
   switch (pattern_id) {
     case 0: led_set_pattern(LEDP_IDLE); break;
@@ -179,13 +130,19 @@ static void ensure_modules_for_mode(uint8_t mode) {
 
 static void set_runtime_mode(uint8_t mode) {
   if (mode > 4) return;
+  const uint8_t prev_mode = s_runtime_mode;
   s_runtime_mode = mode;
   ensure_modules_for_mode(mode);
   if (mode == 0) scene_setup();
-  s_log.print_mode(s_runtime_mode);
+  s_log.print_mode_change(prev_mode, s_runtime_mode);
 }
 
 static void poll_mode_switch_from_serial() {
+  if (!Serial.available()) return;
+
+  const char p = (char)Serial.peek();
+  if (!s_mode_parser.is_capturing() && p != 's' && p != 'S') return;
+
   uint8_t mode = 0;
   if (s_mode_parser.poll(Serial, &mode)) {
     set_runtime_mode(mode);
@@ -197,6 +154,13 @@ static void poll_mode_switch_from_serial() {
   }
   if (s_mode_parser.consume_invalid()) {
     s_log.print_mode_usage();
+  }
+}
+
+static void poll_unhandled_serial_echo() {
+  while (Serial.available()) {
+    const char c = (char)Serial.read();
+    s_log.print_serial_echo(c);
   }
 }
 
@@ -215,6 +179,7 @@ void loop() {
   const uint32_t now_ms = millis();
   poll_mode_switch_from_serial();
   ir_poll_serial_command();
+  poll_unhandled_serial_echo();
 
   if (mode_is(4)) {
     Event e;
