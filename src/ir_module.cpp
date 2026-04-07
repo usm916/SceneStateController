@@ -59,6 +59,8 @@ void ir_poll_serial_command() {
   if (p < '0' || p > '3') return;
 
   const char c = (char)Serial.read();
+  Serial.print("RX: ");
+  Serial.println(c);
   while (Serial.available()) {
     const char t = (char)Serial.peek();
     if (t == '\r' || t == '\n') {

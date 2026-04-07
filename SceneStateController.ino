@@ -10,6 +10,83 @@
 #include "src/scene_controller.h"
 #include "src/console_logger.h"
 
+
+class ModeCommandParser {
+ public:
+  bool poll(Stream& io, uint8_t* out_mode) {
+    while (io.available()) {
+      const char p = (char)io.peek();
+      if (!capturing_) {
+        if (p != 's' && p != 'S') return false;
+        capturing_ = true;
+        len_ = 0;
+      }
+
+      const char c = (char)io.read();
+      Serial.print("RX: ");
+      if (c == '\r') {
+        Serial.println("\\r");
+      } else if (c == '\n') {
+        Serial.println("\\n");
+      } else {
+        Serial.println(c);
+      }
+      if (c == '\r') continue;
+
+      if (c == '\n') {
+        buf_[len_] = '\0';
+        capturing_ = false;
+
+        const bool valid =
+            (len_ == 2) &&
+            (buf_[0] == 's' || buf_[0] == 'S') &&
+            (buf_[1] >= '0' && buf_[1] <= '4');
+        len_ = 0;
+
+        if (valid) {
+          *out_mode = (uint8_t)(buf_[1] - '0');
+          return true;
+        }
+        invalid_ = true;
+        return false;
+      }
+
+      if (len_ < sizeof(buf_) - 1) {
+        buf_[len_++] = c;
+      } else {
+        capturing_ = false;
+        len_ = 0;
+        too_long_ = true;
+        return false;
+      }
+    }
+    return false;
+  }
+
+  bool consume_too_long() {
+    const bool v = too_long_;
+    too_long_ = false;
+    return v;
+  }
+
+  bool consume_invalid() {
+    const bool v = invalid_;
+    invalid_ = false;
+    return v;
+  }
+
+  bool is_capturing() const {
+    return capturing_;
+  }
+
+ private:
+  char buf_[16] = {0};
+  uint8_t len_ = 0;
+  bool capturing_ = false;
+  bool too_long_ = false;
+  bool invalid_ = false;
+};
+
 static ConsoleLogger s_log(Serial);
 static char s_serial_line[24] = {0};
 static uint8_t s_serial_line_len = 0;
@@ -68,6 +145,15 @@ static void handle_serial_line(const char* line, uint8_t len) {
   }
   if (len == 1 && line[0] >= '0' && line[0] <= '3') {
     ir_set_decode_mode((uint8_t)(line[0] - '0'));
+static void poll_mode_switch_from_serial() {
+  if (!Serial.available()) return;
+
+  const char p = (char)Serial.peek();
+  if (!s_mode_parser.is_capturing() && p != 's' && p != 'S') return;
+
+  uint8_t mode = 0;
+  if (s_mode_parser.poll(Serial, &mode)) {
+    set_runtime_mode(mode);
     return;
   }
   if (len >= sizeof(s_serial_line) - 1) {
@@ -95,6 +181,13 @@ static void poll_serial_console() {
   }
 }
 
+static void poll_unhandled_serial_echo() {
+  while (Serial.available()) {
+    const char c = (char)Serial.read();
+    s_log.print_serial_echo(c);
+  }
+}
+
 void setup() {
   Serial.begin(SSC_USB_SERIAL_BAUD);
   delay(1200);
@@ -109,6 +202,9 @@ void setup() {
 void loop() {
   const uint32_t now_ms = millis();
   poll_serial_console();
+  poll_mode_switch_from_serial();
+  ir_poll_serial_command();
+  poll_unhandled_serial_echo();
 
   if (mode_is(4)) {
     Event e;
