@@ -43,3 +43,13 @@
 
 #define SSC_TMC_MOTOR_CURRENT_MA 500
 #define SSC_TMC_HOLD_CURRENT_PCT 30
+
+// Elevator / TMC2209 defaults (single place for tuning)
+#define SSC_TMC_RSENSE_OHM 0.11f
+#define SSC_TMC_TOFF 4
+#define SSC_TMC_BLANK_TIME 24
+#define SSC_TMC_RMS_CURRENT_MA 300
+#define SSC_TMC_RMS_HOLD_MULT 0.6f
+#define SSC_TMC_MICROSTEPS 16
+#define SSC_TMC_ENABLE_SPREADCYCLE 0
+#define SSC_TMC_TPWMTHRS 0

@@ -1,10 +1,10 @@
 #include "elevator_module.h"
 
 #include "config.h"
-#include "tmc2209_module.h"
 
 #include <AccelStepper.h>
 #include <Arduino.h>
+#include <TMCStepper.h>
 
 namespace {
 constexpr uint16_t kMotorFullStepsPerRev = 200;
@@ -12,11 +12,15 @@ constexpr uint8_t kMotorMicrosteps = 16;
 constexpr uint16_t kStartupSpinRpm = 100;
 constexpr uint32_t kStartupSpinDurationMs = 15000;
 
-constexpr float kMoveMaxSpeedDefault = (float)SSC_STEP_HZ_DEFAULT;
+constexpr float kMoveMaxSpeedDefault = 8400.0f;
 constexpr float kMoveAccelerationDefault = 2000.0f;
 constexpr int32_t kSpinHorizonSteps = 32768;
 
+HardwareSerial& s_tmc_serial = Serial1;
+TMC2209Stepper s_driver(&s_tmc_serial, SSC_TMC_RSENSE_OHM, 0);
+
 AccelStepper s_stepper(AccelStepper::DRIVER, SSC_PIN_STEP, SSC_PIN_DIR);
+String s_input_line = "";
 
 int32_t s_current_floor = 0;
 int32_t s_target_floor = 0;
@@ -88,10 +92,20 @@ void elevator_setup() {
   pinMode(SSC_PIN_ENDSTOP_UP, INPUT_PULLUP);
   pinMode(SSC_PIN_ENDSTOP_DOWN, INPUT_PULLUP);
 
-  Serial.println("Setting up into TMC2209...");
-  tmc2209_setup();
-  tmc2209_set_enable(true);
-  Serial.println("finishing setup into TMC2209...");
+  s_tmc_serial.begin(SSC_TMC_UART_BAUD, SERIAL_8N1, SSC_TMC_UART_RX_PIN, SSC_TMC_UART_TX_PIN);
+
+  pinMode(SSC_PIN_EN, OUTPUT);
+  digitalWrite(SSC_PIN_EN, LOW);
+
+  s_driver.begin();
+  s_driver.pdn_disable(true);
+  s_driver.I_scale_analog(false);
+  s_driver.toff(SSC_TMC_TOFF);
+  s_driver.blank_time(SSC_TMC_BLANK_TIME);
+  s_driver.rms_current(SSC_TMC_RMS_CURRENT_MA, SSC_TMC_RMS_HOLD_MULT);
+  s_driver.microsteps(SSC_TMC_MICROSTEPS);
+  s_driver.en_spreadCycle(SSC_TMC_ENABLE_SPREADCYCLE != 0);
+  s_driver.TPWMTHRS(SSC_TMC_TPWMTHRS);
 
   s_stepper.setMaxSpeed(kMoveMaxSpeedDefault);
   s_stepper.setAcceleration(kMoveAccelerationDefault);
@@ -116,27 +130,54 @@ void elevator_stop() {
   }
 }
 
-void elevator_command_move_to(int32_t target_floor) {
-  if (target_floor == s_current_floor) {
-    s_state = EV_ARRIVED;
-    return;
-  }
-
+void handleInput(int32_t target_steps) {
   s_spin_mode = false;
   s_position_mode = true;
   s_spin_dir = 0;
-
-  s_target_floor = target_floor;
-  const int32_t target_steps = target_floor * (int32_t)SSC_STEPS_PER_FLOOR;
 
   s_stepper.setMaxSpeed(kMoveMaxSpeedDefault);
   s_stepper.setAcceleration(kMoveAccelerationDefault);
   s_stepper.moveTo(target_steps);
 
+  s_target_floor = target_steps / (int32_t)SSC_STEPS_PER_FLOOR;
   s_move_active = true;
   s_move_start_ms = millis();
   s_last_check_ms = s_move_start_ms;
-  s_state = (target_floor > s_current_floor) ? EV_MOVING_UP : EV_MOVING_DOWN;
+  s_state = (target_steps >= s_stepper.currentPosition()) ? EV_MOVING_UP : EV_MOVING_DOWN;
+
+  Serial.print("New target: ");
+  Serial.println(target_steps);
+  Serial.print("Current position: ");
+  Serial.println(s_stepper.currentPosition());
+  Serial.print("Distance to go: ");
+  Serial.println(s_stepper.distanceToGo());
+}
+
+void handleSerialInput() {
+  while (Serial.available() > 0) {
+    const char c = (char)Serial.read();
+    if (c == '\n' || c == '\r') {
+      s_input_line.trim();
+      if (s_input_line.length() > 0) {
+        if (s_input_line[0] == 'e' || s_input_line[0] == 'E') {
+          const long target_steps = s_input_line.substring(1).toInt();
+          handleInput((int32_t)target_steps);
+        }
+      }
+      s_input_line = "";
+      continue;
+    }
+    s_input_line += c;
+  }
+}
+
+void elevator_command_move_to(int32_t target_floor) {
+  if (target_floor == s_current_floor) {
+    s_state = EV_ARRIVED;
+    return;
+  }
+  s_target_floor = target_floor;
+  handleInput(target_floor * (int32_t)SSC_STEPS_PER_FLOOR);
 }
 
 void elevator_command_spin_cw(uint16_t rpm) {
@@ -205,7 +246,7 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
     if (s_move_active) {
       s_move_active = false;
       if (s_position_mode && (s_state == EV_MOVING_UP || s_state == EV_MOVING_DOWN)) {
-        s_current_floor = s_target_floor;
+        s_current_floor = s_stepper.currentPosition() / (int32_t)SSC_STEPS_PER_FLOOR;
         s_state = EV_ARRIVED;
         if (out_event) {
           out_event->type = EVT_EV_ARRIVED;
