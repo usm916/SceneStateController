@@ -89,7 +89,9 @@ void loop() {
   const uint32_t now_ms = millis();
   Event serial_event = {EVT_NONE, 0, {}};
 
-  if (serial_console_poll(s_log, set_runtime_mode, &serial_event)) {
+  if (s_runtime_mode == 3) {
+    handleSerialInput();
+  } else if (serial_console_poll(s_log, set_runtime_mode, &serial_event)) {
     if (s_runtime_mode == 0) {
       if (serial_event.type == EVT_PI_CMD_LED) apply_led_override(serial_event.data.led.pattern_id);
       scene_handle_event(serial_event);

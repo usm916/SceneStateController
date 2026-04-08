@@ -38,6 +38,8 @@ void ConsoleLogger::print_serial_echo(char c) {
 
 void ConsoleLogger::print_mode_usage() {
   out_.println("MODE_CMD usage: s0..s4");
+  out_.println("IR decode mode: m0..m3");
+  out_.println("Elevator target (mode 3): e<steps>  (example: e3200)");
   out_.println("TMC usage: TMC MOTOR <mA> | TMC RUN <mA> | TMC HOLD <0..100> | TMC INFO");
 }
 
@@ -49,6 +51,8 @@ void ConsoleLogger::print_startup(uint8_t mode) {
   out_.print("INITIAL MODE=");
   out_.println(mode);
   out_.println("Type s0..s4 + Enter to switch mode at runtime.");
+  out_.println("Type m0..m3 + Enter to switch IR decode mode.");
+  out_.println("In mode 3, type e<steps> + Enter to move elevator.");
   out_.println("READY");
 }
 

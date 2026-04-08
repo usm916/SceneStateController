@@ -4,6 +4,8 @@
 #include "events.h"
 
 void elevator_setup();
+void handleSerialInput();
+void handleInput(int32_t target_steps);
 void elevator_command_move_to(int32_t target_floor);
 void elevator_command_spin_cw(uint16_t rpm);
 void elevator_command_spin_ccw(uint16_t rpm);

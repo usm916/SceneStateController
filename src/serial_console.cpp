@@ -29,8 +29,8 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     set_runtime_mode_fn((uint8_t)(line[1] - '0'));
     return false;
   }
-  if (len == 1 && line[0] >= '0' && line[0] <= '3') {
-    ir_set_decode_mode((uint8_t)(line[0] - '0'));
+  if (len == 2 && (line[0] == 'm' || line[0] == 'M') && line[1] >= '0' && line[1] <= '3') {
+    ir_set_decode_mode((uint8_t)(line[1] - '0'));
     return false;
   }
   if (len >= 6 && strncmp(line, "MOVE ", 5) == 0 && out_event != nullptr) {
@@ -116,7 +116,9 @@ bool serial_console_poll(ConsoleLogger& log,
       s_serial_line[s_serial_line_len++] = c;
       s_serial_line[s_serial_line_len] = '\0';
 
-      if (s_serial_line_len == 1 && s_serial_line[0] >= '0' && s_serial_line[0] <= '3') {
+      if (s_serial_line_len == 2 &&
+          (s_serial_line[0] == 'm' || s_serial_line[0] == 'M') &&
+          s_serial_line[1] >= '0' && s_serial_line[1] <= '3') {
         handle_serial_line(log, s_serial_line, s_serial_line_len, set_runtime_mode_fn, out_event);
         clear_serial_line();
         continue;
