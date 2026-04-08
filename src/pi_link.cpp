@@ -1,12 +1,16 @@
 #include "pi_link.h"
 #include "pi_protocol.h"
+#include "shared_serial.h"
 #include <string.h>
 
 static char s_line[128];
-static uint8_t s_len = 0;
+static SharedSerialCursor s_cursor = {0};
+static bool s_cursor_initialized = false;
 
 void pi_link_setup() {
-  s_len = 0;
+  s_line[0] = 0;
+  shared_serial_cursor_init(&s_cursor);
+  s_cursor_initialized = true;
 }
 
 static bool parse_int(const char* s, int32_t& out) {
@@ -18,37 +22,33 @@ static bool parse_int(const char* s, int32_t& out) {
 }
 
 bool pi_link_poll(Event& out) {
-  while (Serial.available()) {
-    char c = (char)Serial.read();
-    if (c == '\r') continue;
+  if (!s_cursor_initialized) {
+    shared_serial_cursor_init(&s_cursor);
+    s_cursor_initialized = true;
+  }
 
-    if (c == '\n') {
-      s_line[s_len] = 0;
-      s_len = 0;
-
-      if (strncmp(s_line, "MOVE ", 5) == 0) {
-        int32_t floor;
-        if (parse_int(s_line + 5, floor)) {
-          out.type = EVT_PI_CMD_MOVE;
-          out.ts_ms = millis();
-          out.data.move.target_floor = floor;
-          return true;
-        }
-      } else if (strncmp(s_line, "LED ", 4) == 0) {
-        int32_t pat;
-        if (parse_int(s_line + 4, pat)) {
-          out.type = EVT_PI_CMD_LED;
-          out.ts_ms = millis();
-          out.data.led.pattern_id = (uint8_t)pat;
-          return true;
-        }
+  while (shared_serial_read_line(&s_cursor, s_line, sizeof(s_line))) {
+    if (strncmp(s_line, "MOVE ", 5) == 0) {
+      int32_t floor;
+      if (parse_int(s_line + 5, floor)) {
+        out.type = EVT_PI_CMD_MOVE;
+        out.ts_ms = millis();
+        out.data.move.target_floor = floor;
+        return true;
       }
-    } else {
-      if (s_len < sizeof(s_line) - 1) s_line[s_len++] = c;
+    } else if (strncmp(s_line, "LED ", 4) == 0) {
+      int32_t pat;
+      if (parse_int(s_line + 4, pat)) {
+        out.type = EVT_PI_CMD_LED;
+        out.ts_ms = millis();
+        out.data.led.pattern_id = (uint8_t)pat;
+        return true;
+      }
     }
   }
   return false;
 }
+
 
 void pi_link_send_event(const Event& e) {
   switch (e.type) {

@@ -2,18 +2,15 @@
 
 #include "console_logger.h"
 #include "ir_module.h"
+#include "shared_serial.h"
 #include "tmc2209_module.h"
 #include <stdlib.h>
 #include <string.h>
 
 namespace {
 char s_serial_line[24] = {0};
-uint8_t s_serial_line_len = 0;
-
-void clear_serial_line() {
-  s_serial_line_len = 0;
-  s_serial_line[0] = '\0';
-}
+SharedSerialCursor s_serial_cursor = {0};
+bool s_cursor_initialized = false;
 
 bool parse_int(const char* s, int32_t& out) {
   char* endp = nullptr;
@@ -99,37 +96,19 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
 bool serial_console_poll(ConsoleLogger& log,
                          void (*set_runtime_mode_fn)(uint8_t),
                          Event* out_event) {
+  if (!s_cursor_initialized) {
+    shared_serial_cursor_init(&s_serial_cursor);
+    s_cursor_initialized = true;
+  }
+
   if (out_event != nullptr) out_event->type = EVT_NONE;
 
-  while (Serial.available()) {
-    const char c = (char)Serial.read();
-    log.print_serial_echo(c);
-    if (c == '\r') continue;
-    if (c == '\n') {
-      const bool has_event =
-          handle_serial_line(log, s_serial_line, s_serial_line_len, set_runtime_mode_fn, out_event);
-      clear_serial_line();
-      if (has_event) return true;
-      continue;
-    }
-    if (s_serial_line_len < sizeof(s_serial_line) - 1) {
-      s_serial_line[s_serial_line_len++] = c;
-      s_serial_line[s_serial_line_len] = '\0';
-
-      if (s_serial_line_len == 2 &&
-          (s_serial_line[0] == 'm' || s_serial_line[0] == 'M') &&
-          s_serial_line[1] >= '0' && s_serial_line[1] <= '3') {
-        handle_serial_line(log, s_serial_line, s_serial_line_len, set_runtime_mode_fn, out_event);
-        clear_serial_line();
-        continue;
-      }
-      if (s_serial_line_len == 2 &&
-          (s_serial_line[0] == 's' || s_serial_line[0] == 'S') &&
-          s_serial_line[1] >= '0' && s_serial_line[1] <= '4') {
-        handle_serial_line(log, s_serial_line, s_serial_line_len, set_runtime_mode_fn, out_event);
-        clear_serial_line();
-      }
-    }
+  while (shared_serial_read_line(&s_serial_cursor, s_serial_line, sizeof(s_serial_line))) {
+    const uint8_t len = (uint8_t)strlen(s_serial_line);
+    const bool has_event =
+        handle_serial_line(log, s_serial_line, len, set_runtime_mode_fn, out_event);
+    if (has_event) return true;
   }
+
   return false;
 }

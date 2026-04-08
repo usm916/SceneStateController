@@ -10,6 +10,7 @@
 #include "src/serial_console.h"
 #include "src/scene_controller.h"
 #include "src/console_logger.h"
+#include "src/shared_serial.h"
 
 static ConsoleLogger s_log(Serial);
 
@@ -79,6 +80,7 @@ void setup() {
   delay(1200);
   s_log.print_banner();
 
+  shared_serial_setup();
   pi_link_setup();
   s_runtime_mode = SSC_MODE;
   ensure_modules_for_mode(s_runtime_mode);
@@ -87,6 +89,7 @@ void setup() {
 
 void loop() {
   const uint32_t now_ms = millis();
+  shared_serial_pump();
   Event serial_event = {EVT_NONE, 0, {}};
 
   if (s_runtime_mode == 3) {

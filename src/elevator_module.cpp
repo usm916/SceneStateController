@@ -1,6 +1,7 @@
 #include "elevator_module.h"
 
 #include "config.h"
+#include "shared_serial.h"
 
 #include <AccelStepper.h>
 #include <Arduino.h>
@@ -154,22 +155,28 @@ void handleInput(int32_t target_steps) {
 }
 
 void handleSerialInput() {
-  while (Serial.available() > 0) {
-    const char c = (char)Serial.read();
-    if (c == '\n' || c == '\r') {
-      s_input_line.trim();
-      if (s_input_line.length() > 0) {
-        if (s_input_line[0] == 'e' || s_input_line[0] == 'E') {
-          const long target_steps = s_input_line.substring(1).toInt();
-          handleInput((int32_t)target_steps);
-        }
+  static SharedSerialCursor serial_cursor = {0};
+  static bool serial_cursor_initialized = false;
+  static char line[32] = {0};
+
+  if (!serial_cursor_initialized) {
+    shared_serial_cursor_init(&serial_cursor);
+    serial_cursor_initialized = true;
+  }
+
+  while (shared_serial_read_line(&serial_cursor, line, sizeof(line))) {
+    s_input_line = line;
+    s_input_line.trim();
+    if (s_input_line.length() > 0) {
+      if (s_input_line[0] == 'e' || s_input_line[0] == 'E') {
+        const long target_steps = s_input_line.substring(1).toInt();
+        handleInput((int32_t)target_steps);
       }
-      s_input_line = "";
-      continue;
     }
-    s_input_line += c;
+    s_input_line = "";
   }
 }
+
 
 void elevator_command_move_to(int32_t target_floor) {
   if (target_floor == s_current_floor) {
