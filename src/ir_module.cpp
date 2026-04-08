@@ -3,6 +3,9 @@
 #include <IRremote.hpp>
 
 static uint8_t s_decode_mode = 0; // 0=AUTO 1=NEC 2=AEHA 3=SONY
+static RemoteButton s_active_btn = BTN_POWER;
+static uint32_t s_active_btn_until_ms = 0;
+static constexpr uint16_t kIrHoldMs = 180;
 
 static const char* mode_name(uint8_t m) {
   switch (m) {
@@ -22,6 +25,14 @@ static bool protocol_match(decode_type_t proto) {
     case 3: return proto == SONY;
     default: return true;
   }
+}
+
+static bool is_remote_mapping_protocol(decode_type_t proto) {
+  return proto == NEC || (uint8_t)proto == 7;
+}
+
+static bool is_remote_mapping_hit(const IRData& d) {
+  return is_remote_mapping_protocol(d.protocol) && d.address == 0x00;
 }
 
 static void print_raw_timing() {
@@ -71,6 +82,7 @@ bool ir_poll(Event& out) {
 
   auto &d = IrReceiver.decodedIRData;
   const bool matched = protocol_match(d.protocol);
+  const bool map_hit = is_remote_mapping_hit(d);
   // Serial.print("MODE=");
   // Serial.print(mode_name(s_decode_mode));
   // Serial.print("  protocol=");
@@ -87,6 +99,11 @@ bool ir_poll(Event& out) {
     out.data.ir.protocol = (uint8_t)d.protocol;
     out.data.ir.addr = (uint16_t)d.address;
     out.data.ir.cmd  = (uint16_t)d.command;
+
+    if (map_hit) {
+      s_active_btn = (RemoteButton)(uint8_t)d.command;
+      s_active_btn_until_ms = millis() + kIrHoldMs;
+    }
   } else {
     Serial.println("  (filtered)");
   }
@@ -95,4 +112,9 @@ bool ir_poll(Event& out) {
 
   IrReceiver.resume();
   return matched;
+}
+
+bool ir_btn(RemoteButton btn) {
+  const uint32_t now_ms = millis();
+  return now_ms <= s_active_btn_until_ms && s_active_btn == btn;
 }

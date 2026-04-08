@@ -2,6 +2,7 @@
 #include "config.h"
 #include "tmc2209_module.h"
 #include <Arduino.h>
+#include <limits.h>
 
 static volatile int32_t s_step_count = 0;
 static volatile bool s_step_high = false;
@@ -22,6 +23,24 @@ static constexpr uint16_t kMotorFullStepsPerRev = 200;
 static constexpr uint8_t kMotorMicrosteps = 16;
 static constexpr uint16_t kStartupSpinRpm = 100;
 static constexpr uint32_t kStartupSpinDurationMs = 15000;
+
+static void start_spin(bool cw, uint16_t rpm, int32_t target_steps) {
+  const uint32_t step_hz = ((uint32_t)rpm * kMotorFullStepsPerRev * kMotorMicrosteps) / 60UL;
+  if (step_hz == 0) return;
+
+  const uint32_t alarm_us = (uint32_t)(1000000UL / (step_hz * 2UL));
+  digitalWrite(SSC_PIN_DIR, cw ? LOW : HIGH);
+  timerAlarm(s_timer, alarm_us, true, 0);
+
+  portENTER_CRITICAL(&s_timerMux);
+  s_step_count = 0;
+  s_target_steps = target_steps;
+  s_running = true;
+  portEXIT_CRITICAL(&s_timerMux);
+
+  s_move_start_ms = millis();
+  s_last_check_ms = s_move_start_ms;
+}
 
 static void ARDUINO_ISR_ATTR on_timer() {
   portENTER_CRITICAL_ISR(&s_timerMux);
@@ -117,6 +136,16 @@ void elevator_command_move_to(int32_t target_floor) {
   s_state = up ? EV_MOVING_UP : EV_MOVING_DOWN;
 }
 
+void elevator_command_spin_cw(uint16_t rpm) {
+  start_spin(true, rpm, INT_MAX);
+  s_state = EV_MOVING_UP;
+}
+
+void elevator_command_spin_ccw(uint16_t rpm) {
+  start_spin(false, rpm, INT_MAX);
+  s_state = EV_MOVING_DOWN;
+}
+
 void elevator_tick(uint32_t now_ms, Event* out_event) {
   if (out_event) out_event->type = EVT_NONE;
 
@@ -178,7 +207,7 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
   }
 
   const uint32_t timeout_ms = 20000;
-  if ((s_state == EV_MOVING_UP || s_state == EV_MOVING_DOWN) && (now_ms - s_move_start_ms > timeout_ms)) {
+  if ((s_state == EV_MOVING_UP || s_state == EV_MOVING_DOWN) && s_target_steps != INT_MAX && (now_ms - s_move_start_ms > timeout_ms)) {
     elevator_stop();
     s_state = EV_ERROR;
     if (out_event) {
