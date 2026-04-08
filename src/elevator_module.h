@@ -5,6 +5,8 @@
 
 void elevator_setup();
 void elevator_command_move_to(int32_t target_floor);
+void elevator_command_spin_cw(uint16_t rpm);
+void elevator_command_spin_ccw(uint16_t rpm);
 void elevator_stop();
 void elevator_tick(uint32_t now_ms, Event* out_event);
 EvState elevator_state();

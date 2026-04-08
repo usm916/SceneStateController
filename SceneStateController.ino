@@ -18,6 +18,8 @@ static bool s_ir_ready = false;
 static bool s_led_ready = false;
 static bool s_elevator_ready = false;
 static bool s_scene_ready = false;
+static int8_t s_manual_spin_dir = 0;
+static constexpr uint16_t kManualSpinRpm = 300;
 
 static void apply_led_override(uint8_t pattern_id);
 static bool mode_is(uint8_t mode);
@@ -108,6 +110,26 @@ void loop() {
         pi_link_send_event(e);
       } else {
         scene_handle_event(e);
+      }
+    }
+
+    if (s_elevator_ready) {
+      const bool prev_pressed = ir_btn(BTN_PREV);
+      const bool next_pressed = ir_btn(BTN_NEXT);
+
+      if (prev_pressed && !next_pressed) {
+        if (s_manual_spin_dir != 1) {
+          elevator_command_spin_cw(kManualSpinRpm);
+          s_manual_spin_dir = 1;
+        }
+      } else if (next_pressed && !prev_pressed) {
+        if (s_manual_spin_dir != -1) {
+          elevator_command_spin_ccw(kManualSpinRpm);
+          s_manual_spin_dir = -1;
+        }
+      } else if (s_manual_spin_dir != 0) {
+        elevator_stop();
+        s_manual_spin_dir = 0;
       }
     }
   }
