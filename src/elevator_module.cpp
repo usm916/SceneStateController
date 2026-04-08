@@ -1,78 +1,83 @@
 #include "elevator_module.h"
+
 #include "config.h"
 #include "tmc2209_module.h"
+
+#include <AccelStepper.h>
 #include <Arduino.h>
-#include <limits.h>
 
-static volatile int32_t s_step_count = 0;
-static volatile bool s_step_high = false;
-static volatile bool s_running = false;
+namespace {
+constexpr uint16_t kMotorFullStepsPerRev = 200;
+constexpr uint8_t kMotorMicrosteps = 16;
+constexpr uint16_t kStartupSpinRpm = 100;
+constexpr uint32_t kStartupSpinDurationMs = 15000;
 
-static int32_t s_target_steps = 0;
-static int32_t s_current_floor = 0;
-static EvState s_state = EV_IDLE;
-static uint32_t s_move_start_ms = 0;
-static uint32_t s_last_check_ms = 0;
-static bool s_startup_spin_scheduled = true;
-static bool s_startup_spin_active = false;
+constexpr float kMoveMaxSpeedDefault = (float)SSC_STEP_HZ_DEFAULT;
+constexpr float kMoveAccelerationDefault = 2000.0f;
+constexpr int32_t kSpinHorizonSteps = 32768;
 
-static hw_timer_t* s_timer = nullptr;
-static portMUX_TYPE s_timerMux = portMUX_INITIALIZER_UNLOCKED;
+AccelStepper s_stepper(AccelStepper::DRIVER, SSC_PIN_STEP, SSC_PIN_DIR);
 
-static constexpr uint16_t kMotorFullStepsPerRev = 200;
-static constexpr uint8_t kMotorMicrosteps = 16;
-static constexpr uint16_t kStartupSpinRpm = 100;
-static constexpr uint32_t kStartupSpinDurationMs = 15000;
+int32_t s_current_floor = 0;
+int32_t s_target_floor = 0;
+EvState s_state = EV_IDLE;
 
-static void start_spin(bool cw, uint16_t rpm, int32_t target_steps) {
-  const uint32_t step_hz = ((uint32_t)rpm * kMotorFullStepsPerRev * kMotorMicrosteps) / 60UL;
-  if (step_hz == 0) return;
+bool s_move_active = false;
+bool s_spin_mode = false;
+bool s_position_mode = false;
+int8_t s_spin_dir = 0;  // 1:cw, -1:ccw
 
-  const uint32_t alarm_us = (uint32_t)(1000000UL / (step_hz * 2UL));
-  digitalWrite(SSC_PIN_DIR, cw ? LOW : HIGH);
-  timerAlarm(s_timer, alarm_us, true, 0);
+bool s_startup_spin_scheduled = true;
+bool s_startup_spin_active = false;
+uint32_t s_startup_spin_until_ms = 0;
 
-  portENTER_CRITICAL(&s_timerMux);
-  s_step_count = 0;
-  s_target_steps = target_steps;
-  s_running = true;
-  portEXIT_CRITICAL(&s_timerMux);
+uint32_t s_move_start_ms = 0;
+uint32_t s_last_check_ms = 0;
+
+float rpm_to_steps_per_sec(uint16_t rpm) {
+  return ((float)rpm * (float)kMotorFullStepsPerRev * (float)kMotorMicrosteps) / 60.0f;
+}
+
+void begin_spin(int8_t dir, uint16_t rpm) {
+  const float spin_speed = rpm_to_steps_per_sec(rpm);
+  if (spin_speed <= 0.0f) return;
+
+  s_spin_mode = true;
+  s_position_mode = false;
+  s_spin_dir = dir;
+  s_move_active = true;
+
+  s_stepper.setAcceleration(kMoveAccelerationDefault);
+  s_stepper.setMaxSpeed(spin_speed);
+
+  const int32_t now_pos = s_stepper.currentPosition();
+  const int32_t horizon = (dir > 0) ? kSpinHorizonSteps : -kSpinHorizonSteps;
+  s_stepper.moveTo(now_pos + horizon);
 
   s_move_start_ms = millis();
   s_last_check_ms = s_move_start_ms;
+  s_state = (dir > 0) ? EV_MOVING_UP : EV_MOVING_DOWN;
 }
 
-static void ARDUINO_ISR_ATTR on_timer() {
-  portENTER_CRITICAL_ISR(&s_timerMux);
-  if (!s_running) {
-    if (s_step_high) {
-      digitalWrite(SSC_PIN_STEP, LOW);
-      s_step_high = false;
-    }
-    portEXIT_CRITICAL_ISR(&s_timerMux);
-    return;
-  }
+void keep_spin_target_ahead() {
+  if (!s_spin_mode || s_spin_dir == 0) return;
 
-  if (!s_step_high) {
-    digitalWrite(SSC_PIN_STEP, HIGH);
-    s_step_high = true;
-  } else {
-    digitalWrite(SSC_PIN_STEP, LOW);
-    s_step_high = false;
-    s_step_count++;
-    if (s_step_count >= s_target_steps) {
-      s_running = false;
-    }
+  const int32_t dist = s_stepper.distanceToGo();
+  if ((s_spin_dir > 0 && dist < (kSpinHorizonSteps / 2)) ||
+      (s_spin_dir < 0 && dist > -(kSpinHorizonSteps / 2))) {
+    const int32_t extension = (s_spin_dir > 0) ? kSpinHorizonSteps : -kSpinHorizonSteps;
+    s_stepper.moveTo(s_stepper.targetPosition() + extension);
   }
-  portEXIT_CRITICAL_ISR(&s_timerMux);
 }
 
-static bool endstop_hit_up() {
+bool endstop_hit_up() {
   return digitalRead(SSC_PIN_ENDSTOP_UP) == LOW;
 }
-static bool endstop_hit_down() {
+
+bool endstop_hit_down() {
   return digitalRead(SSC_PIN_ENDSTOP_DOWN) == LOW;
 }
+}  // namespace
 
 void elevator_setup() {
   pinMode(SSC_PIN_STEP, OUTPUT);
@@ -84,13 +89,13 @@ void elevator_setup() {
   pinMode(SSC_PIN_ENDSTOP_DOWN, INPUT_PULLUP);
 
   Serial.println("Setting up into TMC2209...");
-
   tmc2209_setup();
   tmc2209_set_enable(true);
   Serial.println("finishing setup into TMC2209...");
-  s_timer = timerBegin(1000000); // 1 MHz timer frequency (ESP32 core 3.x)
-  timerAttachInterrupt(s_timer, &on_timer);
-  timerAlarm(s_timer, 1000, true, 0); // 1 tick = 1 us at 1 MHz
+
+  s_stepper.setMaxSpeed(kMoveMaxSpeedDefault);
+  s_stepper.setAcceleration(kMoveAccelerationDefault);
+  s_stepper.setCurrentPosition(0);
 
   s_state = EV_IDLE;
   s_startup_spin_scheduled = true;
@@ -98,15 +103,17 @@ void elevator_setup() {
 }
 
 EvState elevator_state() { return s_state; }
+
 int32_t elevator_floor() { return s_current_floor; }
 
 void elevator_stop() {
-  portENTER_CRITICAL(&s_timerMux);
-  s_running = false;
-  s_step_count = 0;
-  s_target_steps = 0;
-  portEXIT_CRITICAL(&s_timerMux);
-  s_state = EV_IDLE;
+  s_spin_mode = false;
+  s_position_mode = false;
+  s_spin_dir = 0;
+
+  if (s_move_active) {
+    s_stepper.stop();
+  }
 }
 
 void elevator_command_move_to(int32_t target_floor) {
@@ -115,72 +122,48 @@ void elevator_command_move_to(int32_t target_floor) {
     return;
   }
 
-  const bool up = (target_floor > s_current_floor);
-  digitalWrite(SSC_PIN_DIR, up ? HIGH : LOW);
+  s_spin_mode = false;
+  s_position_mode = true;
+  s_spin_dir = 0;
 
-  const int32_t floors = abs(target_floor - s_current_floor);
-  const int32_t steps_total = floors * (int32_t)SSC_STEPS_PER_FLOOR;
+  s_target_floor = target_floor;
+  const int32_t target_steps = target_floor * (int32_t)SSC_STEPS_PER_FLOOR;
 
-  const uint32_t step_hz = SSC_STEP_HZ_DEFAULT;
-  const uint32_t alarm_us = (uint32_t)(1000000UL / (step_hz * 2UL));
-  timerAlarm(s_timer, alarm_us, true, 0);
+  s_stepper.setMaxSpeed(kMoveMaxSpeedDefault);
+  s_stepper.setAcceleration(kMoveAccelerationDefault);
+  s_stepper.moveTo(target_steps);
 
-  portENTER_CRITICAL(&s_timerMux);
-  s_step_count = 0;
-  s_target_steps = steps_total;
-  s_running = true;
-  portEXIT_CRITICAL(&s_timerMux);
-
+  s_move_active = true;
   s_move_start_ms = millis();
   s_last_check_ms = s_move_start_ms;
-  s_state = up ? EV_MOVING_UP : EV_MOVING_DOWN;
+  s_state = (target_floor > s_current_floor) ? EV_MOVING_UP : EV_MOVING_DOWN;
 }
 
 void elevator_command_spin_cw(uint16_t rpm) {
-  start_spin(true, rpm, INT_MAX);
-  s_state = EV_MOVING_UP;
+  begin_spin(1, rpm);
 }
 
 void elevator_command_spin_ccw(uint16_t rpm) {
-  start_spin(false, rpm, INT_MAX);
-  s_state = EV_MOVING_DOWN;
+  begin_spin(-1, rpm);
 }
 
 void elevator_tick(uint32_t now_ms, Event* out_event) {
   if (out_event) out_event->type = EVT_NONE;
 
   if (s_startup_spin_scheduled) {
-    const uint32_t step_hz = ((uint32_t)kStartupSpinRpm * kMotorFullStepsPerRev * kMotorMicrosteps) / 60UL;
-    const uint32_t alarm_us = (uint32_t)(1000000UL / (step_hz * 2UL));
-    const uint32_t target_steps = (step_hz * kStartupSpinDurationMs) / 1000UL;
-
-    digitalWrite(SSC_PIN_DIR, LOW);
-    timerAlarm(s_timer, alarm_us, true, 0);
-
-    portENTER_CRITICAL(&s_timerMux);
-    s_step_count = 0;
-    s_target_steps = (int32_t)target_steps;
-    s_running = true;
-    portEXIT_CRITICAL(&s_timerMux);
-
+    begin_spin(1, kStartupSpinRpm);
     s_startup_spin_scheduled = false;
     s_startup_spin_active = true;
-    s_move_start_ms = now_ms;
-    s_last_check_ms = now_ms;
-    return;
+    s_startup_spin_until_ms = now_ms + kStartupSpinDurationMs;
   }
 
-  if (s_startup_spin_active) {
-    bool running;
-    portENTER_CRITICAL(&s_timerMux);
-    running = s_running;
-    portEXIT_CRITICAL(&s_timerMux);
-    if (!running) {
-      s_startup_spin_active = false;
-      s_state = EV_IDLE;
-    }
-    return;
+  if (s_startup_spin_active && now_ms >= s_startup_spin_until_ms) {
+    elevator_stop();
+    s_startup_spin_active = false;
   }
+
+  keep_spin_target_ahead();
+  s_stepper.run();
 
   if (now_ms - s_last_check_ms < 20) return;
   s_last_check_ms = now_ms;
@@ -207,7 +190,7 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
   }
 
   const uint32_t timeout_ms = 20000;
-  if ((s_state == EV_MOVING_UP || s_state == EV_MOVING_DOWN) && s_target_steps != INT_MAX && (now_ms - s_move_start_ms > timeout_ms)) {
+  if (s_move_active && s_position_mode && (now_ms - s_move_start_ms > timeout_ms)) {
     elevator_stop();
     s_state = EV_ERROR;
     if (out_event) {
@@ -218,22 +201,23 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
     return;
   }
 
-  bool running;
-  int32_t step_count, target_steps;
-  portENTER_CRITICAL(&s_timerMux);
-  running = s_running;
-  step_count = s_step_count;
-  target_steps = s_target_steps;
-  portEXIT_CRITICAL(&s_timerMux);
+  if (!s_stepper.isRunning()) {
+    if (s_move_active) {
+      s_move_active = false;
+      if (s_position_mode && (s_state == EV_MOVING_UP || s_state == EV_MOVING_DOWN)) {
+        s_current_floor = s_target_floor;
+        s_state = EV_ARRIVED;
+        if (out_event) {
+          out_event->type = EVT_EV_ARRIVED;
+          out_event->ts_ms = now_ms;
+        }
+      } else {
+        s_state = EV_IDLE;
+      }
+    }
 
-  if (!running && (s_state == EV_MOVING_UP || s_state == EV_MOVING_DOWN) && target_steps > 0 && step_count >= target_steps) {
-    if (s_state == EV_MOVING_UP) s_current_floor += (target_steps / (int32_t)SSC_STEPS_PER_FLOOR);
-    if (s_state == EV_MOVING_DOWN) s_current_floor -= (target_steps / (int32_t)SSC_STEPS_PER_FLOOR);
-
-    s_state = EV_ARRIVED;
-    if (out_event) {
-      out_event->type = EVT_EV_ARRIVED;
-      out_event->ts_ms = now_ms;
+    if (s_state == EV_ARRIVED && s_position_mode) {
+      s_stepper.setCurrentPosition((int32_t)s_current_floor * (int32_t)SSC_STEPS_PER_FLOOR);
     }
   }
 }
