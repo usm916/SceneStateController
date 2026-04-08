@@ -21,7 +21,7 @@ static portMUX_TYPE s_timerMux = portMUX_INITIALIZER_UNLOCKED;
 static constexpr uint16_t kMotorFullStepsPerRev = 200;
 static constexpr uint8_t kMotorMicrosteps = 16;
 static constexpr uint16_t kStartupSpinRpm = 100;
-static constexpr uint32_t kStartupSpinDurationMs = 5000;
+static constexpr uint32_t kStartupSpinDurationMs = 15000;
 
 static void ARDUINO_ISR_ATTR on_timer() {
   portENTER_CRITICAL_ISR(&s_timerMux);

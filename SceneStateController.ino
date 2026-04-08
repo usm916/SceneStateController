@@ -102,7 +102,7 @@ void loop() {
     Event e;
     if (ir_poll(e)) {
 #if SSC_IR_LOG_ENABLE
-      s_log.print_ir_event(e);
+      // s_log.print_ir_event(e);
 #endif
       if (s_runtime_mode == 1) {
         pi_link_send_event(e);

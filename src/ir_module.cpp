@@ -71,16 +71,16 @@ bool ir_poll(Event& out) {
 
   auto &d = IrReceiver.decodedIRData;
   const bool matched = protocol_match(d.protocol);
-  Serial.print("MODE=");
-  Serial.print(mode_name(s_decode_mode));
-  Serial.print("  protocol=");
-  Serial.print(getProtocolString(d.protocol));
+  // Serial.print("MODE=");
+  // Serial.print(mode_name(s_decode_mode));
+  // Serial.print("  protocol=");
+  // Serial.print(getProtocolString(d.protocol));
 
   if (matched) {
-    Serial.print("  address=0x");
-    Serial.print((uint16_t)d.address, HEX);
-    Serial.print("  command=0x");
-    Serial.println((uint16_t)d.command, HEX);
+    // Serial.print("  address=0x");
+    // Serial.print((uint16_t)d.address, HEX);
+    // Serial.print("  command=0x");
+    // Serial.println((uint16_t)d.command, HEX);
 
     out.type = EVT_IR_BUTTON;
     out.ts_ms = millis();
@@ -91,7 +91,7 @@ bool ir_poll(Event& out) {
     Serial.println("  (filtered)");
   }
 
-  print_raw_timing();
+  // print_raw_timing();
 
   IrReceiver.resume();
   return matched;
