@@ -63,6 +63,7 @@ bool serial_console_poll(ConsoleLogger& log,
                          void (*set_runtime_mode_fn)(uint8_t),
                          Event* out_event) {
   if (out_event != nullptr) out_event->type = EVT_NONE;
+
   while (Serial.available()) {
     const char c = (char)Serial.read();
     log.print_serial_echo(c);

@@ -40,21 +40,27 @@ static bool mode_is(uint8_t mode) {
 
 static void ensure_modules_for_mode(uint8_t mode) {
   if ((mode == 0 || mode == 1) && !s_ir_ready) {
+    Serial.println("Setting up IR...");
     ir_setup();
     s_ir_ready = true;
   }
   if ((mode == 0 || mode == 2) && !s_led_ready) {
+    Serial.println("Setting up LED...");
     led_setup();
     s_led_ready = true;
   }
   if ((mode == 0 || mode == 3) && !s_elevator_ready) {
+    Serial.println("Setting up elevator...");
     elevator_setup();
     s_elevator_ready = true;
   }
   if (mode == 0 && !s_scene_ready) {
+    Serial.println("Setting up scene...");
     scene_setup();
     s_scene_ready = true;
   }
+
+  Serial.println("setuped");
 }
 
 static void set_runtime_mode(uint8_t mode) {
@@ -80,6 +86,7 @@ void setup() {
 void loop() {
   const uint32_t now_ms = millis();
   Event serial_event = {EVT_NONE, 0, {}};
+
   if (serial_console_poll(s_log, set_runtime_mode, &serial_event)) {
     if (s_runtime_mode == 0) {
       if (serial_event.type == EVT_PI_CMD_LED) apply_led_override(serial_event.data.led.pattern_id);

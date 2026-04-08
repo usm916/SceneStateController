@@ -57,9 +57,11 @@ void elevator_setup() {
   pinMode(SSC_PIN_ENDSTOP_UP, INPUT_PULLUP);
   pinMode(SSC_PIN_ENDSTOP_DOWN, INPUT_PULLUP);
 
+  Serial.println("Setting up into TMC2209...");
+
   tmc2209_setup();
   tmc2209_set_enable(true);
-
+   Serial.println("finishing setup into TMC2209...");
   s_timer = timerBegin(1000000); // 1 MHz timer frequency (ESP32 core 3.x)
   timerAttachInterrupt(s_timer, &on_timer);
   timerAlarm(s_timer, 1000, true, 0); // 1 tick = 1 us at 1 MHz

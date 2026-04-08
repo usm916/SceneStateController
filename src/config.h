@@ -10,9 +10,9 @@
 #define SSC_PIN_ENDSTOP_UP    32
 #define SSC_PIN_ENDSTOP_DOWN  33
 
-#define SSC_TMC_UART_PORT     1
-#define SSC_TMC_UART_PIN      17
-#define SSC_TMC_UART_BAUD     115200
+// #define SSC_TMC_UART_PORT     1
+// #define SSC_TMC_UART_PIN      17
+// #define SSC_TMC_UART_BAUD     115200
 
 #define SSC_LED_COUNT         100
 #define SSC_LED_BRIGHTNESS    64
@@ -36,7 +36,7 @@
 
 // TMC2209 UART (added for UART switch)
 #define SSC_TMC_UART_BAUD 115200
-#define SSC_TMC_UART_ONEWIRE  1
+#define SSC_TMC_UART_ONEWIRE  0
 #define SSC_TMC_UART_ONEWIRE_PIN  17
 #define SSC_TMC_UART_RX_PIN  16
 #define SSC_TMC_UART_TX_PIN  17

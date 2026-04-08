@@ -8,7 +8,8 @@ static constexpr float RSENSE = 0.11f;
 static TMC2209Stepper s_drv(&s_ser, RSENSE, 0);
 
 void tmc2209_setup() {
-    #if SSC_TMC_UART_ONEWIRE
+  Serial.println("Setting up elevator...0");
+  #if SSC_TMC_UART_ONEWIRE
   s_ser.begin(SSC_TMC_UART_BAUD, SERIAL_8N1, SSC_TMC_UART_ONEWIRE_PIN, SSC_TMC_UART_ONEWIRE_PIN);
   #else
   s_ser.begin(SSC_TMC_UART_BAUD, SERIAL_8N1, SSC_TMC_UART_RX_PIN, SSC_TMC_UART_TX_PIN);
@@ -16,7 +17,6 @@ void tmc2209_setup() {
   pinMode(SSC_PIN_EN, OUTPUT);
   digitalWrite(SSC_PIN_EN, LOW);
   delay(50);
-
   s_drv.begin();
   tmc2209_configure_defaults();
 }
