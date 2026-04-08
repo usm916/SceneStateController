@@ -31,3 +31,17 @@ Endstop UP -> GPIO32 (active low), Endstop DOWN -> GPIO33 (active low)
 ## UART wiring modes
 - One-wire (default): SSC_TMC_UART_ONEWIRE=1, use SSC_TMC_UART_ONEWIRE_PIN.
 - Two-wire: set SSC_TMC_UART_ONEWIRE=0 and define SSC_TMC_UART_RX_PIN / SSC_TMC_UART_TX_PIN.
+
+## TMC2209 current tuning (USB Serial commands)
+- `TMC MOTOR <mA>`: sets motor RMS current (same as run current in this prototype).
+- `TMC RUN <mA>`: alias of `TMC MOTOR` for compatibility with common naming.
+- `TMC HOLD <0..100>`: hold current percentage relative to run current.
+- `TMC INFO`: prints current settings.
+
+Meaning of values:
+- `motor_current` / `run_current`: TMC2209 coil RMS current in mA.
+- `hold_current`: percentage used while stopped; lower values reduce heat.
+
+Typical starting points for NEMA17-class steppers:
+- `run_current`: 500–800 mA
+- `hold_current`: 30–50%

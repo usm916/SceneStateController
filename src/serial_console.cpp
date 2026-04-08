@@ -2,6 +2,7 @@
 
 #include "console_logger.h"
 #include "ir_module.h"
+#include "tmc2209_module.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -49,6 +50,42 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       out_event->data.led.pattern_id = (uint8_t)pattern;
       return true;
     }
+  }
+  if (len >= 11 && strncmp(line, "TMC MOTOR ", 10) == 0) {
+    int32_t current_ma = 0;
+    if (parse_int(line + 10, current_ma) && current_ma > 0 && current_ma <= 2000) {
+      tmc2209_set_motor_current_ma((uint16_t)current_ma);
+      Serial.print("TMC motor_current(mA)=");
+      Serial.println(tmc2209_motor_current_ma());
+      return false;
+    }
+  }
+  if (len >= 9 && strncmp(line, "TMC RUN ", 8) == 0) {
+    int32_t current_ma = 0;
+    if (parse_int(line + 8, current_ma) && current_ma > 0 && current_ma <= 2000) {
+      tmc2209_set_run_current_ma((uint16_t)current_ma);
+      Serial.print("TMC run_current(mA)=");
+      Serial.println(tmc2209_run_current_ma());
+      return false;
+    }
+  }
+  if (len >= 10 && strncmp(line, "TMC HOLD ", 9) == 0) {
+    int32_t hold_pct = 0;
+    if (parse_int(line + 9, hold_pct) && hold_pct >= 0 && hold_pct <= 100) {
+      tmc2209_set_hold_current_pct((uint8_t)hold_pct);
+      Serial.print("TMC hold_current(%)=");
+      Serial.println(tmc2209_hold_current_pct());
+      return false;
+    }
+  }
+  if (len == 8 && strncmp(line, "TMC INFO", 8) == 0) {
+    Serial.print("TMC motor_current(mA)=");
+    Serial.println(tmc2209_motor_current_ma());
+    Serial.print("TMC run_current(mA)=");
+    Serial.println(tmc2209_run_current_ma());
+    Serial.print("TMC hold_current(%)=");
+    Serial.println(tmc2209_hold_current_pct());
+    return false;
   }
   if (len >= sizeof(s_serial_line) - 1) {
     log.print_mode_cmd_too_long();
