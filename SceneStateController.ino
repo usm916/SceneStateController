@@ -79,17 +79,15 @@ void setup() {
 
 void loop() {
   const uint32_t now_ms = millis();
-  serial_console_poll(s_log, set_runtime_mode);
-
-  if (mode_is(4)) {
-    Event e;
-    if (pi_link_poll(e)) {
-      if (s_runtime_mode == 4) {
-        pi_link_send_event(e);
-      } else {
-        if (e.type == EVT_PI_CMD_LED) apply_led_override(e.data.led.pattern_id);
-        scene_handle_event(e);
-      }
+  Event serial_event = {EVT_NONE, 0, {}};
+  if (serial_console_poll(s_log, set_runtime_mode, &serial_event)) {
+    if (s_runtime_mode == 0) {
+      if (serial_event.type == EVT_PI_CMD_LED) apply_led_override(serial_event.data.led.pattern_id);
+      scene_handle_event(serial_event);
+    } else if (s_runtime_mode == 2 && serial_event.type == EVT_PI_CMD_LED) {
+      apply_led_override(serial_event.data.led.pattern_id);
+    } else if (s_runtime_mode == 3 && serial_event.type == EVT_PI_CMD_MOVE) {
+      elevator_command_move_to(serial_event.data.move.target_floor);
     }
   }
 
