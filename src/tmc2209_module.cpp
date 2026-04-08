@@ -6,6 +6,17 @@
 static HardwareSerial& s_ser = Serial1;
 static constexpr float RSENSE = 0.11f;
 static TMC2209Stepper s_drv(&s_ser, RSENSE, 0);
+static uint16_t s_motor_current_ma = SSC_TMC_MOTOR_CURRENT_MA;
+static uint8_t s_hold_current_pct = SSC_TMC_HOLD_CURRENT_PCT;
+
+static uint8_t clamp_hold_pct(uint8_t hold_pct) {
+  return hold_pct > 100 ? 100 : hold_pct;
+}
+
+static void apply_current_settings() {
+  s_hold_current_pct = clamp_hold_pct(s_hold_current_pct);
+  s_drv.rms_current(s_motor_current_ma, s_hold_current_pct);
+}
 
 void tmc2209_setup() {
   Serial.println("Setting up elevator...0");
@@ -26,10 +37,36 @@ void tmc2209_configure_defaults() {
   s_drv.I_scale_analog(false);
   s_drv.toff(4);
   s_drv.blank_time(24);
-  s_drv.rms_current(650);
+  apply_current_settings();
   s_drv.microsteps(16);
   s_drv.en_spreadCycle(false);
   s_drv.TPWMTHRS(0);
+}
+
+void tmc2209_set_motor_current_ma(uint16_t current_ma) {
+  s_motor_current_ma = current_ma;
+  apply_current_settings();
+}
+
+void tmc2209_set_run_current_ma(uint16_t current_ma) {
+  tmc2209_set_motor_current_ma(current_ma);
+}
+
+void tmc2209_set_hold_current_pct(uint8_t hold_pct) {
+  s_hold_current_pct = clamp_hold_pct(hold_pct);
+  apply_current_settings();
+}
+
+uint16_t tmc2209_motor_current_ma() {
+  return s_motor_current_ma;
+}
+
+uint16_t tmc2209_run_current_ma() {
+  return tmc2209_motor_current_ma();
+}
+
+uint8_t tmc2209_hold_current_pct() {
+  return s_hold_current_pct;
 }
 
 void tmc2209_set_enable(bool en) {
