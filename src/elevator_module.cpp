@@ -67,12 +67,28 @@ float rpm_to_steps_per_sec(uint16_t rpm) {
   return ((float)rpm * (float)kMotorFullStepsPerRev * (float)kMotorMicrosteps) / 60.0f;
 }
 
+bool endstop_hit_up_no_pullup() {
+  return digitalRead(SSC_PIN_ENDSTOP_UP) == HIGH;
+}
+
+bool endstop_hit_down_no_pullup() {
+  return digitalRead(SSC_PIN_ENDSTOP_DOWN) == HIGH;
+}
+
 bool endstop_hit_up() {
+#if SSC_ENDSTOP_USE_INPUT_PULLUP
   return digitalRead(SSC_PIN_ENDSTOP_UP) == LOW;
+#else
+  return endstop_hit_up_no_pullup();
+#endif
 }
 
 bool endstop_hit_down() {
+#if SSC_ENDSTOP_USE_INPUT_PULLUP
   return digitalRead(SSC_PIN_ENDSTOP_DOWN) == LOW;
+#else
+  return endstop_hit_down_no_pullup();
+#endif
 }
 
 bool active_homing_switch_hit() {
@@ -263,8 +279,13 @@ void elevator_setup() {
   digitalWrite(SSC_PIN_STEP, LOW);
   digitalWrite(SSC_PIN_DIR, LOW);
 
+#if SSC_ENDSTOP_USE_INPUT_PULLUP
   pinMode(SSC_PIN_ENDSTOP_UP, INPUT_PULLUP);
   pinMode(SSC_PIN_ENDSTOP_DOWN, INPUT_PULLUP);
+#else
+  pinMode(SSC_PIN_ENDSTOP_UP, INPUT);
+  pinMode(SSC_PIN_ENDSTOP_DOWN, INPUT);
+#endif
 
   s_tmc_serial.begin(SSC_TMC_UART_BAUD, SERIAL_8N1, SSC_TMC_UART_RX_PIN, SSC_TMC_UART_TX_PIN);
 

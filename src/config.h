@@ -10,6 +10,13 @@
 #define SSC_PIN_ENDSTOP_UP    25
 #define SSC_PIN_ENDSTOP_DOWN  13
 
+// Endstop input mode:
+// 1: INPUT_PULLUP + active LOW switch (default)
+// 0: INPUT (no pull-up) + active HIGH switch
+#ifndef SSC_ENDSTOP_USE_INPUT_PULLUP
+#define SSC_ENDSTOP_USE_INPUT_PULLUP 1
+#endif
+
 // #define SSC_TMC_UART_PORT     1
 // #define SSC_TMC_UART_PIN      17
 // #define SSC_TMC_UART_BAUD     115200
