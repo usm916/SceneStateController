@@ -12,6 +12,9 @@ enum EvState : uint8_t {
   EV_IDLE = 0,
   EV_MOVING_UP,
   EV_MOVING_DOWN,
+  EV_HOMING_ZERO,
+  EV_HOMING_TOP,
+  EV_CALIBRATING,
   EV_ARRIVED,
   EV_ERROR,
 };
@@ -31,6 +34,9 @@ static inline const char* ev_state_name(EvState s) {
     case EV_IDLE: return "EV_IDLE";
     case EV_MOVING_UP: return "EV_MOVING_UP";
     case EV_MOVING_DOWN: return "EV_MOVING_DOWN";
+    case EV_HOMING_ZERO: return "EV_HOMING_ZERO";
+    case EV_HOMING_TOP: return "EV_HOMING_TOP";
+    case EV_CALIBRATING: return "EV_CALIBRATING";
     case EV_ARRIVED: return "EV_ARRIVED";
     case EV_ERROR: return "EV_ERROR";
     default: return "EV_UNKNOWN";

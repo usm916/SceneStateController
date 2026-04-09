@@ -1,6 +1,7 @@
 #include "scene_controller.h"
 #include "led_module.h"
 #include "elevator_module.h"
+#include "ir_module.h"
 #include "pi_link.h"
 #include "pi_protocol.h"
 
@@ -39,9 +40,12 @@ void scene_handle_event(const Event& e) {
         elevator_command_move_to(s_target_floor);
         set_scene(SCENE_MOVE);
       } else if (e.type == EVT_IR_BUTTON) {
-        s_target_floor = elevator_floor() + 1;
-        elevator_command_move_to(s_target_floor);
-        set_scene(SCENE_MOVE);
+        const RemoteButton btn = (RemoteButton)e.data.ir.cmd;
+        if (btn == BTN_0 || btn == BTN_1 || btn == BTN_2 || btn == BTN_3) {
+          s_target_floor = (int32_t)(btn - BTN_0);
+          elevator_command_move_to(s_target_floor);
+          set_scene(SCENE_MOVE);
+        }
       }
       break;
 

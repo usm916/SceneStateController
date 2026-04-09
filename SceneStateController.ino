@@ -21,6 +21,7 @@ static bool s_elevator_ready = false;
 static bool s_scene_ready = false;
 static int8_t s_manual_spin_dir = 0;
 static RemoteButton s_last_floor_btn = BTN_NONE;
+static RemoteButton s_last_control_btn = BTN_NONE;
 static constexpr uint16_t kManualSpinRpm = 300;
 
 static void apply_led_override(uint8_t pattern_id);
@@ -127,6 +128,8 @@ void loop() {
       const bool next_released = ir_btn_released(BTN_NEXT);
       const bool floor_btn_pressed =
           current_btn == BTN_0 || current_btn == BTN_1 || current_btn == BTN_2 || current_btn == BTN_3;
+      const bool control_btn_pressed =
+          current_btn == BTN_EQ || current_btn == BTN_VOL_DOWN || current_btn == BTN_VOL_UP;
 
       if (floor_btn_pressed && current_btn != s_last_floor_btn) {
         switch (current_btn) {
@@ -140,6 +143,20 @@ void loop() {
         s_manual_spin_dir = 0;
       } else if (!floor_btn_pressed) {
         s_last_floor_btn = BTN_NONE;
+      }
+
+      if (control_btn_pressed && current_btn != s_last_control_btn) {
+        if (current_btn == BTN_EQ) {
+          elevator_command_start_calibration();
+        } else if (current_btn == BTN_VOL_DOWN) {
+          elevator_command_home_zero();
+        } else if (current_btn == BTN_VOL_UP) {
+          elevator_command_home_top();
+        }
+        s_last_control_btn = current_btn;
+        s_manual_spin_dir = 0;
+      } else if (!control_btn_pressed) {
+        s_last_control_btn = BTN_NONE;
       }
 
       if (prev_pressed && !next_pressed) {
