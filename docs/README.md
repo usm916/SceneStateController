@@ -89,3 +89,39 @@ Typical starting points for NEMA17-class steppers:
 2. `SSC_STEP_HZ_DEFAULT` を低め（例: 800）から開始。
 3. `kMoveAccelerationDefault` を低め（例: 1000〜2000）から開始。
 4. 徐々に速度・加速度を上げ、脱調や発熱を見ながら詰める。
+
+## IRボタンが「効いたり効かなかったり」見えるとき
+
+以下のような `else if` 連鎖で `ev_state != BTN_X` を条件にしている場合、
+**一度 `ev_state` が `BTN_X` になると、どこかで明示的に解除しない限り再押下が無視されます。**
+
+- 典型的な問題:
+  - `ev_state` を `BTN_NONE` に戻す処理がない
+  - ボタン押下の「レベル判定（押されている間 true）」を使っている
+  - 同じボタンの再押下で `ev_state != BTN_X` が常に false になる
+
+### 対策（推奨）
+- 全ボタンが離された瞬間に `ev_state = BTN_NONE` を入れる。
+- 可能ならレベル判定ではなく、**立ち上がりエッジ（just pressed）**で `handleInput()` を呼ぶ。
+- `1.5 * SSC_STEPS_PER_FLOOR` のような小数フロア指定は、丸め規則を明示する（`lroundf` など）。
+
+### 最小修正例
+```cpp
+if (!m00_pressed && !m10_pressed && !m15_pressed && !m20_pressed) {
+  ev_state = BTN_NONE;
+}
+
+if (m00_pressed && ev_state != BTN_0) {
+  handleInput(0);
+  ev_state = BTN_0;
+} else if (m10_pressed && ev_state != BTN_1) {
+  handleInput(1 * (int32_t)SSC_STEPS_PER_FLOOR);
+  ev_state = BTN_1;
+} else if (m15_pressed && ev_state != BTN_2) {
+  handleInput((int32_t)lroundf(1.5f * (float)SSC_STEPS_PER_FLOOR));
+  ev_state = BTN_2;
+} else if (m20_pressed && ev_state != BTN_3) {
+  handleInput(2 * (int32_t)SSC_STEPS_PER_FLOOR);
+  ev_state = BTN_3;
+}
+```
