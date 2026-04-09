@@ -3,7 +3,7 @@
 #include <string.h>
 
 namespace {
-constexpr uint8_t kSharedSerialLineCount = 16;
+constexpr uint8_t kSharedSerialLineCount = 32;
 constexpr uint8_t kSharedSerialLineMaxLen = 127;
 
 char s_build_line[kSharedSerialLineMaxLen + 1] = {0};
@@ -63,7 +63,9 @@ void shared_serial_pump() {
 
 void shared_serial_cursor_init(SharedSerialCursor* cursor) {
   if (cursor == nullptr) return;
-  cursor->next_seq = s_next_seq;
+  const uint16_t oldest_available =
+      (s_next_seq > kSharedSerialLineCount) ? (uint16_t)(s_next_seq - kSharedSerialLineCount) : 0;
+  cursor->next_seq = oldest_available;
 }
 
 bool shared_serial_read_line(SharedSerialCursor* cursor, char* out_line, size_t out_size) {
