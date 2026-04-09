@@ -12,7 +12,7 @@ Install (Arduino IDE Library Manager):
 - WS2812B DATA: add 330–470 ohm series resistor near ESP32 pin.
 - IR receiver OUT -> SSC_PIN_IR (default GPIO23). VCC per module spec.
 - TMC2209: STEP/DIR/EN -> SSC_PIN_STEP/DIR/EN.
-- Endstops: wire to GND when pressed (active LOW), pins default GPIO32/33 with INPUT_PULLUP.
+- Endstops: wire to GND when pressed (active LOW), pins default GPIO25/13 with INPUT_PULLUP.
 
 ## 2. Power-up order (recommended)
 - Power ESP32 first or at the same time as WS2812B to reduce random LED states.
