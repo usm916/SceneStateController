@@ -1,6 +1,7 @@
 #include "serial_console.h"
 
 #include "console_logger.h"
+#include "elevator_module.h"
 #include "ir_module.h"
 #include "shared_serial.h"
 #include "tmc2209_module.h"
@@ -29,6 +30,13 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
   if (len == 2 && (line[0] == 'm' || line[0] == 'M') && line[1] >= '0' && line[1] <= '3') {
     ir_set_decode_mode((uint8_t)(line[1] - '0'));
     return false;
+  }
+  if (len >= 2 && (line[0] == 'e' || line[0] == 'E')) {
+    int32_t target_steps = 0;
+    if (parse_int(line + 1, target_steps)) {
+      handleInput(target_steps);
+      return false;
+    }
   }
   if (len >= 6 && strncmp(line, "MOVE ", 5) == 0 && out_event != nullptr) {
     int32_t floor = 0;
