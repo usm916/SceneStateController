@@ -129,7 +129,7 @@ void loop() {
       const bool floor_btn_pressed =
           current_btn == BTN_0 || current_btn == BTN_1 || current_btn == BTN_2 || current_btn == BTN_3;
       const bool control_btn_pressed =
-          current_btn == BTN_EQ || current_btn == BTN_VOL_DOWN || current_btn == BTN_VOL_UP;
+          current_btn == BTN_POWER || current_btn == BTN_EQ || current_btn == BTN_VOL_DOWN || current_btn == BTN_VOL_UP;
 
       if (floor_btn_pressed && current_btn != s_last_floor_btn) {
         switch (current_btn) {
@@ -146,7 +146,9 @@ void loop() {
       }
 
       if (control_btn_pressed && current_btn != s_last_control_btn) {
-        if (current_btn == BTN_EQ) {
+        if (current_btn == BTN_POWER) {
+          elevator_command_emergency_stop();
+        } else if (current_btn == BTN_EQ) {
           elevator_command_start_calibration();
         } else if (current_btn == BTN_VOL_DOWN) {
           elevator_command_home_zero();

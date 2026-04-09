@@ -401,6 +401,14 @@ void elevator_command_start_calibration() {
   begin_homing(false, false);
 }
 
+void elevator_command_emergency_stop() {
+  elevator_stop();
+  s_move_active = false;
+  s_homing.active = false;
+  s_calibration_armed = false;
+  s_state = EV_ERROR;
+}
+
 void elevator_tick(uint32_t now_ms, Event* out_event) {
   if (out_event) out_event->type = EVT_NONE;
 

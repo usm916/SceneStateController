@@ -12,6 +12,7 @@ void elevator_command_spin_ccw(uint16_t rpm);
 void elevator_command_home_zero();
 void elevator_command_home_top();
 void elevator_command_start_calibration();
+void elevator_command_emergency_stop();
 bool elevator_calibration_in_progress();
 bool elevator_has_valid_calibration();
 int32_t elevator_top_limit_steps();
