@@ -38,6 +38,7 @@ uint32_t s_startup_spin_until_ms = 0;
 
 uint32_t s_move_start_ms = 0;
 uint32_t s_last_check_ms = 0;
+uint32_t s_move_timeout_ms = 20000;
 
 float rpm_to_steps_per_sec(uint16_t rpm) {
   return ((float)rpm * (float)kMotorFullStepsPerRev * (float)kMotorMicrosteps) / 60.0f;
@@ -132,6 +133,8 @@ void elevator_stop() {
 }
 
 void handleInput(int32_t target_steps) {
+  s_startup_spin_scheduled = false;
+  s_startup_spin_active = false;
   s_spin_mode = false;
   s_position_mode = true;
   s_spin_dir = 0;
@@ -144,6 +147,11 @@ void handleInput(int32_t target_steps) {
   s_move_active = true;
   s_move_start_ms = millis();
   s_last_check_ms = s_move_start_ms;
+  const int32_t travel_steps = abs(s_stepper.distanceToGo());
+  const float max_speed = s_stepper.maxSpeed();
+  const uint32_t dynamic_timeout_ms =
+      (max_speed > 1.0f) ? (uint32_t)((1000.0f * (float)travel_steps) / max_speed) + 5000 : 20000;
+  s_move_timeout_ms = (dynamic_timeout_ms < 20000) ? 20000 : dynamic_timeout_ms;
   s_state = (target_steps >= s_stepper.currentPosition()) ? EV_MOVING_UP : EV_MOVING_DOWN;
 
   Serial.print("New target: ");
@@ -237,8 +245,7 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
     return;
   }
 
-  const uint32_t timeout_ms = 20000;
-  if (s_move_active && s_position_mode && (now_ms - s_move_start_ms > timeout_ms)) {
+  if (s_move_active && s_position_mode && (now_ms - s_move_start_ms > s_move_timeout_ms)) {
     elevator_stop();
     s_state = EV_ERROR;
     if (out_event) {
