@@ -138,7 +138,7 @@ void loop() {
         }
         s_last_floor_btn = current_btn;
         s_manual_spin_dir = 0;
-      } else if (current_btn == BTN_NONE) {
+      } else if (!floor_btn_pressed) {
         s_last_floor_btn = BTN_NONE;
       }
 
