@@ -46,6 +46,10 @@ Install (Arduino IDE Library Manager):
 - Set SSC_MODE=1
 - Press remote keys.
 - Expect: "IR <proto> 0x<addr> 0x<cmd>" lines.
+- Functional checks:
+  - `VOL-`: zero homing starts
+  - `EQ`: calibration mode starts (zero homing)
+  - `VOL+`: top homing starts; when calibration is armed, saves top range
 - If nothing:
   - Confirm IR OUT pin matches SSC_PIN_IR
   - Confirm IR module VCC (3.3V vs 5V)

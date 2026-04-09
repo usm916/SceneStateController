@@ -53,7 +53,7 @@ Typical starting points for NEMA17-class steppers:
 `moveTo` + `run` で加減速つきの移動を行います。
 
 ### 挙動の概要
-- 起動時に短いウォームアップ回転（startup spin）を実施します。
+- 起動時の位置確定は `VOL-` によるゼロホーミングで行います（必要に応じて起動シーケンスへ組み込み）。
 - 位置移動は floor 指定で行い、内部で `SSC_STEPS_PER_FLOOR` を使って step 数へ変換します。
 - 手動スピン（CW/CCW）は連続回転ターゲットを前方へ延長しながら回します。
 - 停止時は即停止ではなく、加速度設定に従って減速停止します。
@@ -74,6 +74,13 @@ Typical starting points for NEMA17-class steppers:
    - `NEXT` 押下: CCW回転
    - どちらも押していない: 減速停止
 
+#### 3) Homing / Calibration（IR）
+- `VOL-` (`BTN_VOL_DOWN`): ゼロホーミング（DOWN endstopへ復帰して0位置を確定）
+- `VOL+` (`BTN_VOL_UP`): トップホーミング（UP endstopまで移動）
+- `EQ` (`BTN_EQ`): キャリブレーション開始（ゼロホーミング実行後、`VOL+`でトップ位置を保存）
+
+保存データは `Preferences`（NVS, namespace: `ev_calib`）に `top_step` として保持されます。
+
 ### 調整パラメータ（まずはここ）
 - `SSC_STEPS_PER_FLOOR`（`src/config.h`）:
   フロアあたりのステップ数。機構に合わせて最優先で調整。
@@ -81,8 +88,10 @@ Typical starting points for NEMA17-class steppers:
   位置移動の最大速度（step/s相当）。
 - `kMoveAccelerationDefault`（`src/elevator_module.cpp`）:
   加速度（step/s^2）。大きすぎると脱調しやすいので徐々に上げる。
-- `kStartupSpinRpm` / `kStartupSpinDurationMs`（`src/elevator_module.cpp`）:
-  起動時ウォームアップ回転の速度と時間。
+- `kHomingFastSpeed` / `kHomingSlowSpeed`（`src/elevator_module.cpp`）:
+  ホーミング時の高速/低速の速度。
+- `kHomingBackoffSteps`（`src/elevator_module.cpp`）:
+  一度スイッチ検出後に戻る量（再接触で精度を上げる）。
 
 ### 初期チューニング手順（推奨）
 1. `TMC RUN 600` / `TMC HOLD 30` あたりで電流を設定。
