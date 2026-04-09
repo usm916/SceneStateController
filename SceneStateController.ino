@@ -20,6 +20,7 @@ static bool s_led_ready = false;
 static bool s_elevator_ready = false;
 static bool s_scene_ready = false;
 static int8_t s_manual_spin_dir = 0;
+static RemoteButton s_last_floor_btn = BTN_NONE;
 static constexpr uint16_t kManualSpinRpm = 300;
 
 static void apply_led_override(uint8_t pattern_id);
@@ -119,8 +120,27 @@ void loop() {
     }
 
     if (s_elevator_ready) {
-      const bool prev_pressed = ir_btn(BTN_PREV);
-      const bool next_pressed = ir_btn(BTN_NEXT);
+      const RemoteButton current_btn = ir_active_btn();
+      const bool prev_pressed = (current_btn == BTN_PREV);
+      const bool next_pressed = (current_btn == BTN_NEXT);
+      const bool prev_released = ir_btn_released(BTN_PREV);
+      const bool next_released = ir_btn_released(BTN_NEXT);
+      const bool floor_btn_pressed =
+          current_btn == BTN_0 || current_btn == BTN_1 || current_btn == BTN_2 || current_btn == BTN_3;
+
+      if (floor_btn_pressed && current_btn != s_last_floor_btn) {
+        switch (current_btn) {
+          case BTN_0: handleInput(0); break;
+          case BTN_1: handleInput(1 * (int32_t)SSC_STEPS_PER_FLOOR); break;
+          case BTN_2: handleInput((3 * (int32_t)SSC_STEPS_PER_FLOOR) / 2); break;
+          case BTN_3: handleInput(2 * (int32_t)SSC_STEPS_PER_FLOOR); break;
+          default: break;
+        }
+        s_last_floor_btn = current_btn;
+        s_manual_spin_dir = 0;
+      } else if (current_btn == BTN_NONE) {
+        s_last_floor_btn = BTN_NONE;
+      }
 
       if (prev_pressed && !next_pressed) {
         if (s_manual_spin_dir != 1) {
@@ -132,7 +152,8 @@ void loop() {
           elevator_command_spin_ccw(kManualSpinRpm);
           s_manual_spin_dir = -1;
         }
-      } else if (s_manual_spin_dir != 0) {
+      } else if (!floor_btn_pressed && (current_btn == BTN_NONE || prev_released || next_released) &&
+                 s_manual_spin_dir != 0) {
         elevator_stop();
         s_manual_spin_dir = 0;
       }

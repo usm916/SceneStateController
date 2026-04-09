@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 enum RemoteButton : uint8_t {
+  BTN_NONE       = 0xFF,
   BTN_POWER      = 0x45,
   BTN_MODE       = 0x46,
   BTN_MUTE       = 0x47,
@@ -36,4 +37,8 @@ void ir_setup();
 bool ir_poll(Event& out);
 void ir_set_decode_mode(uint8_t mode);
 bool ir_btn(RemoteButton btn);
+bool ir_btn_released(RemoteButton btn);
+bool ir_any_btn();
+RemoteButton ir_active_btn();
+RemoteButton ir_get_latest_button();
 inline bool btn(RemoteButton btn_code) { return ir_btn(btn_code); }

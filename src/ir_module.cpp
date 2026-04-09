@@ -3,9 +3,18 @@
 #include <IRremote.hpp>
 
 static uint8_t s_decode_mode = 0; // 0=AUTO 1=NEC 2=AEHA 3=SONY
-static RemoteButton s_active_btn = BTN_POWER;
+static RemoteButton s_active_btn = BTN_NONE;
+static RemoteButton s_released_btn = BTN_NONE;
 static uint32_t s_active_btn_until_ms = 0;
 static constexpr uint16_t kIrHoldMs = 180;
+
+static void update_button_lifecycle(uint32_t now_ms) {
+  if (s_active_btn != BTN_NONE && now_ms > s_active_btn_until_ms) {
+    s_released_btn = s_active_btn;
+    s_active_btn = BTN_NONE;
+    s_active_btn_until_ms = 0;
+  }
+}
 
 static const char* mode_name(uint8_t m) {
   switch (m) {
@@ -78,6 +87,7 @@ void ir_setup() {
 }
 
 bool ir_poll(Event& out) {
+  update_button_lifecycle(millis());
   if (!IrReceiver.decode()) return false;
 
   auto &d = IrReceiver.decodedIRData;
@@ -101,7 +111,11 @@ bool ir_poll(Event& out) {
     out.data.ir.cmd  = (uint16_t)d.command;
 
     if (map_hit) {
-      s_active_btn = (RemoteButton)(uint8_t)d.command;
+      const RemoteButton next_btn = (RemoteButton)(uint8_t)d.command;
+      if (s_active_btn != BTN_NONE && s_active_btn != next_btn) {
+        s_released_btn = s_active_btn;
+      }
+      s_active_btn = next_btn;
       s_active_btn_until_ms = millis() + kIrHoldMs;
     }
   } else {
@@ -116,5 +130,32 @@ bool ir_poll(Event& out) {
 
 bool ir_btn(RemoteButton btn) {
   const uint32_t now_ms = millis();
+  update_button_lifecycle(now_ms);
   return now_ms <= s_active_btn_until_ms && s_active_btn == btn;
+}
+
+bool ir_btn_released(RemoteButton btn) {
+  update_button_lifecycle(millis());
+  if (s_released_btn == btn) {
+    s_released_btn = BTN_NONE;
+    return true;
+  }
+  return false;
+}
+
+bool ir_any_btn() {
+  update_button_lifecycle(millis());
+  return s_active_btn != BTN_NONE;
+}
+
+RemoteButton ir_active_btn() {
+  update_button_lifecycle(millis());
+  return s_active_btn;
+}
+
+RemoteButton ir_get_latest_button() {
+  Event ignored = {};
+  ignored.type = EVT_NONE;
+  (void)ir_poll(ignored);
+  return ir_active_btn();
 }
