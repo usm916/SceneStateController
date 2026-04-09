@@ -7,8 +7,8 @@
 #define SSC_PIN_DIR           27
 #define SSC_PIN_EN            14
 
-#define SSC_PIN_ENDSTOP_UP    32
-#define SSC_PIN_ENDSTOP_DOWN  33
+#define SSC_PIN_ENDSTOP_UP    25
+#define SSC_PIN_ENDSTOP_DOWN  13
 
 // #define SSC_TMC_UART_PORT     1
 // #define SSC_TMC_UART_PIN      17

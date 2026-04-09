@@ -26,7 +26,7 @@ IR OUT -> GPIO23
 WS2812B DATA -> GPIO18
 STEP -> GPIO26, DIR -> GPIO27, EN -> GPIO14 (active low on many boards)
 PDN_UART (one-wire) -> GPIO17 (may require diode/resistor network)
-Endstop UP -> GPIO32 (active low), Endstop DOWN -> GPIO33 (active low)
+Endstop UP -> GPIO25 (active low), Endstop DOWN -> GPIO13 (active low)
 
 
 ## UART wiring modes

@@ -83,6 +83,23 @@ bool endstop_hit_up() {
 bool endstop_hit_down() {
   return digitalRead(SSC_PIN_ENDSTOP_DOWN) == LOW;
 }
+
+void emergency_stop_with_error(uint32_t now_ms, Event* out_event, int32_t error_code) {
+  elevator_stop();
+  s_move_active = false;
+  s_state = EV_ERROR;
+  if (out_event) {
+    out_event->type = EVT_EV_ERROR;
+    out_event->ts_ms = now_ms;
+    out_event->data.error_code = error_code;
+  }
+}
+
+void zero_at_bottom_endstop() {
+  s_stepper.setCurrentPosition(0);
+  s_current_floor = 0;
+  s_target_floor = 0;
+}
 }  // namespace
 
 void elevator_setup() {
@@ -224,24 +241,13 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
   if (now_ms - s_last_check_ms < 20) return;
   s_last_check_ms = now_ms;
 
-  if (s_state == EV_MOVING_UP && endstop_hit_up()) {
-    elevator_stop();
-    s_state = EV_ERROR;
-    if (out_event) {
-      out_event->type = EVT_EV_ERROR;
-      out_event->ts_ms = now_ms;
-      out_event->data.error_code = 1001;
-    }
+  if (endstop_hit_up()) {
+    emergency_stop_with_error(now_ms, out_event, 1001);
     return;
   }
-  if (s_state == EV_MOVING_DOWN && endstop_hit_down()) {
-    elevator_stop();
-    s_state = EV_ERROR;
-    if (out_event) {
-      out_event->type = EVT_EV_ERROR;
-      out_event->ts_ms = now_ms;
-      out_event->data.error_code = 1002;
-    }
+  if (endstop_hit_down()) {
+    zero_at_bottom_endstop();
+    emergency_stop_with_error(now_ms, out_event, 1002);
     return;
   }
 
