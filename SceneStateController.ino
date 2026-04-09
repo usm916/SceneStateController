@@ -89,7 +89,7 @@ void setup() {
 }
 
 void loop() {
-  const uint32_t now_ms = millis();
+  uint32_t now_ms = millis();
   shared_serial_pump();
   Event serial_event = {EVT_NONE, 0, {}};
 
@@ -161,6 +161,7 @@ void loop() {
   }
 
   if (mode_is(3)) {
+    now_ms = millis();
     Event ev_e;
     elevator_tick(now_ms, &ev_e);
     if (ev_e.type != EVT_NONE) {
@@ -173,10 +174,12 @@ void loop() {
   }
 
   if (mode_is(2)) {
+    now_ms = millis();
     led_tick(now_ms);
   }
 
   if (s_runtime_mode == 0) {
+    now_ms = millis();
     scene_tick(now_ms);
   }
 }
