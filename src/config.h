@@ -17,7 +17,7 @@
 #define SSC_LED_COUNT         100
 #define SSC_LED_BRIGHTNESS    64
 
-#define SSC_STEPS_PER_FLOOR   3200
+#define SSC_STEPS_PER_FLOOR   25600
 #define SSC_STEP_HZ_DEFAULT   800
 #define SSC_STEP_PULSE_US     2
 
@@ -41,8 +41,8 @@
 #define SSC_TMC_UART_RX_PIN  16
 #define SSC_TMC_UART_TX_PIN  17
 
-#define SSC_TMC_MOTOR_CURRENT_MA 500
-#define SSC_TMC_HOLD_CURRENT_PCT 30
+#define SSC_TMC_MOTOR_CURRENT_MA 330
+#define SSC_TMC_HOLD_CURRENT_PCT 60
 
 // Elevator / TMC2209 defaults (single place for tuning)
 #define SSC_TMC_RSENSE_OHM 0.11f

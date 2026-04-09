@@ -11,7 +11,7 @@ namespace {
 constexpr uint16_t kMotorFullStepsPerRev = 200;
 constexpr uint8_t kMotorMicrosteps = 16;
 constexpr uint16_t kStartupSpinRpm = 100;
-constexpr uint32_t kStartupSpinDurationMs = 15000;
+constexpr uint32_t kStartupSpinDurationMs = 2000;
 
 constexpr float kMoveMaxSpeedDefault = 8400.0f;
 constexpr float kMoveAccelerationDefault = 2000.0f;
