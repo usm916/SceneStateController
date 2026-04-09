@@ -132,8 +132,8 @@ void loop() {
         switch (current_btn) {
           case BTN_0: handleInput(0); break;
           case BTN_1: handleInput(1 * (int32_t)SSC_STEPS_PER_FLOOR); break;
-          case BTN_2: handleInput((3 * (int32_t)SSC_STEPS_PER_FLOOR) / 2); break;
-          case BTN_3: handleInput(2 * (int32_t)SSC_STEPS_PER_FLOOR); break;
+          case BTN_2: handleInput(2 * (int32_t)SSC_STEPS_PER_FLOOR); break;
+          case BTN_3: handleInput(3 * (int32_t)SSC_STEPS_PER_FLOOR); break;
           default: break;
         }
         s_last_floor_btn = current_btn;
