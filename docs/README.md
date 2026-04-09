@@ -28,6 +28,10 @@ STEP -> GPIO26, DIR -> GPIO27, EN -> GPIO14 (active low on many boards)
 PDN_UART (one-wire) -> GPIO17 (may require diode/resistor network)
 Endstop UP -> GPIO25 (active low), Endstop DOWN -> GPIO13 (active low)
 
+If you want endstops without internal pull-up:
+- Set `SSC_ENDSTOP_USE_INPUT_PULLUP` to `0` in `src/config.h`.
+- Endstop input mode changes to `INPUT` and pressed-level is treated as `HIGH`.
+
 
 ## UART wiring modes
 - One-wire (default): SSC_TMC_UART_ONEWIRE=1, use SSC_TMC_UART_ONEWIRE_PIN.
