@@ -19,12 +19,13 @@ constexpr int32_t kMaxTravelSteps = 8 * (int32_t)SSC_STEPS_PER_FLOOR;
 
 constexpr float kHomingFastSpeed = 4200.0f;
 constexpr float kHomingSlowSpeed = 900.0f;
-constexpr int32_t kHomingBackoffSteps = 480;
 
 constexpr char kPrefsNs[] = "ev_calib";
 constexpr char kPrefsKeyVersion[] = "ver";
 constexpr char kPrefsKeyTopStep[] = "top_step";
-constexpr uint32_t kCalibVersion = 1;
+constexpr char kPrefsKeyTopMargin[] = "top_margin";
+constexpr char kPrefsKeyBottomMargin[] = "btm_margin";
+constexpr uint32_t kCalibVersion = 2;
 
 HardwareSerial& s_tmc_serial = Serial1;
 TMC2209Stepper s_driver(&s_tmc_serial, SSC_TMC_RSENSE_OHM, 0);
@@ -46,6 +47,8 @@ bool s_is_homed_zero = false;
 bool s_calibration_armed = false;
 bool s_has_calibration = false;
 int32_t s_top_limit_steps = (int32_t)SSC_STEPS_PER_FLOOR;
+int32_t s_top_margin_steps = 0;
+int32_t s_bottom_margin_steps = 0;
 
 uint32_t s_move_start_ms = 0;
 uint32_t s_last_check_ms = 0;
@@ -55,10 +58,14 @@ struct HomingSession {
   bool active = false;
   bool toward_top = false;
   bool capture_for_calibration = false;
-  uint8_t phase = 0;  // 1 seek, 2 backoff, 3 slow seek
+  uint8_t phase = 0;  // 1 seek, 2 slow release-seek, 3 margin settle
   int8_t dir = 0;
   int8_t backoff_dir = 0;
   int32_t phase_start_pos = 0;
+  int32_t hit_pos = 0;
+  int32_t release_pos = 0;
+  int32_t release_steps = 0;
+  int32_t margin_steps = 0;
 };
 
 HomingSession s_homing;
@@ -140,6 +147,8 @@ bool save_calibration() {
   if (!s_prefs.begin(kPrefsNs, false)) return false;
   s_prefs.putUInt(kPrefsKeyVersion, kCalibVersion);
   s_prefs.putInt(kPrefsKeyTopStep, s_top_limit_steps);
+  s_prefs.putInt(kPrefsKeyTopMargin, s_top_margin_steps);
+  s_prefs.putInt(kPrefsKeyBottomMargin, s_bottom_margin_steps);
   s_prefs.end();
   return true;
 }
@@ -149,10 +158,19 @@ void load_calibration() {
   if (!s_prefs.begin(kPrefsNs, true)) return;
   const uint32_t version = s_prefs.getUInt(kPrefsKeyVersion, 0);
   const int32_t top_step = s_prefs.getInt(kPrefsKeyTopStep, 0);
+  const int32_t top_margin = s_prefs.getInt(kPrefsKeyTopMargin, 0);
+  const int32_t bottom_margin = s_prefs.getInt(kPrefsKeyBottomMargin, 0);
   s_prefs.end();
 
-  if (version == kCalibVersion && top_step > 0) {
+  if ((version == 1 || version == kCalibVersion) && top_step > 0) {
     s_top_limit_steps = top_step;
+    if (version == kCalibVersion) {
+      s_top_margin_steps = (top_margin > 0) ? top_margin : 0;
+      s_bottom_margin_steps = (bottom_margin > 0) ? bottom_margin : 0;
+    } else {
+      s_top_margin_steps = 0;
+      s_bottom_margin_steps = 0;
+    }
     s_has_calibration = true;
   }
 }
@@ -190,6 +208,35 @@ void begin_homing(bool toward_top, bool capture_for_calibration) {
   }
 }
 
+void finish_homing_at_margin_reference(uint32_t now_ms, Event* out_event) {
+  if (s_homing.toward_top) {
+    s_top_margin_steps = s_homing.margin_steps;
+    if (s_homing.capture_for_calibration && s_calibration_armed && s_is_homed_zero) {
+      s_top_limit_steps = s_stepper.currentPosition();
+      s_has_calibration = save_calibration();
+    }
+    s_state = EV_IDLE;
+  } else {
+    s_bottom_margin_steps = s_homing.margin_steps;
+    zero_at_bottom_endstop();
+    s_state = s_calibration_armed ? EV_CALIBRATING : EV_IDLE;
+  }
+
+  s_homing.active = false;
+  s_move_active = false;
+  configure_motion_defaults();
+  s_stepper.stop();
+
+  if (s_homing.capture_for_calibration && s_homing.toward_top) {
+    s_calibration_armed = false;
+  }
+
+  if (out_event) {
+    out_event->type = EVT_EV_ARRIVED;
+    out_event->ts_ms = now_ms;
+  }
+}
+
 void homing_fail(uint32_t now_ms, Event* out_event, int32_t error_code) {
   s_homing.active = false;
   s_move_active = false;
@@ -214,49 +261,37 @@ void handle_homing_tick(uint32_t now_ms, Event* out_event) {
 
   if (s_homing.phase == 1) {
     if (active_homing_switch_hit()) {
+      s_homing.hit_pos = s_stepper.currentPosition();
       s_homing.phase = 2;
-      s_homing.phase_start_pos = s_stepper.currentPosition();
-      s_stepper.setMaxSpeed(kHomingFastSpeed);
-      s_stepper.moveTo(s_homing.phase_start_pos + (int32_t)s_homing.backoff_dir * kHomingBackoffSteps);
+      s_homing.phase_start_pos = s_homing.hit_pos;
+      s_stepper.setMaxSpeed(kHomingSlowSpeed);
+      s_stepper.moveTo(s_homing.phase_start_pos + (int32_t)s_homing.backoff_dir * kMaxTravelSteps);
     }
     return;
   }
 
   if (s_homing.phase == 2) {
     if (!active_homing_switch_hit()) {
-      s_homing.phase = 3;
-      s_homing.phase_start_pos = s_stepper.currentPosition();
-      s_stepper.setMaxSpeed(kHomingSlowSpeed);
-      s_stepper.moveTo(s_homing.phase_start_pos + (int32_t)s_homing.dir * kHomingBackoffSteps * 3);
+      s_homing.release_pos = s_stepper.currentPosition();
+      s_homing.release_steps = abs(s_homing.release_pos - s_homing.hit_pos);
+      if (s_homing.release_steps <= 0) s_homing.release_steps = 1;
+      s_homing.margin_steps = s_homing.release_steps * 2;
+
+      const int32_t extra_margin_steps = s_homing.margin_steps - s_homing.release_steps;
+      if (extra_margin_steps > 0) {
+        s_homing.phase = 3;
+        s_homing.phase_start_pos = s_homing.release_pos;
+        s_stepper.setMaxSpeed(kHomingSlowSpeed);
+        s_stepper.moveTo(s_homing.phase_start_pos + (int32_t)s_homing.backoff_dir * extra_margin_steps);
+      } else {
+        finish_homing_at_margin_reference(now_ms, out_event);
+      }
     }
     return;
   }
 
-  if (s_homing.phase == 3 && active_homing_switch_hit()) {
-    if (s_homing.toward_top) {
-      if (s_homing.capture_for_calibration && s_calibration_armed && s_is_homed_zero) {
-        s_top_limit_steps = s_stepper.currentPosition();
-        s_has_calibration = save_calibration();
-      }
-      s_state = EV_IDLE;
-    } else {
-      zero_at_bottom_endstop();
-      s_state = s_calibration_armed ? EV_CALIBRATING : EV_IDLE;
-    }
-
-    s_homing.active = false;
-    s_move_active = false;
-    configure_motion_defaults();
-    s_stepper.stop();
-
-    if (s_homing.capture_for_calibration && s_homing.toward_top) {
-      s_calibration_armed = false;
-    }
-
-    if (out_event) {
-      out_event->type = EVT_EV_ARRIVED;
-      out_event->ts_ms = now_ms;
-    }
+  if (s_homing.phase == 3 && !s_stepper.isRunning()) {
+    finish_homing_at_margin_reference(now_ms, out_event);
   }
 }
 
