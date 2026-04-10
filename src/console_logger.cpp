@@ -41,6 +41,7 @@ void ConsoleLogger::print_mode_usage() {
   out_.println("IR decode mode: m0..m3");
   out_.println("Elevator target (mode 3): e<steps>  (example: e3200)");
   out_.println("TMC usage: TMC MOTOR <mA> | TMC RUN <mA> | TMC HOLD <0..100> | TMC INFO");
+  out_.println("System info: INFO");
 }
 
 void ConsoleLogger::print_mode_cmd_too_long() {
