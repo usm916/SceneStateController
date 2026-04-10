@@ -23,11 +23,21 @@ static int8_t s_manual_spin_dir = 0;
 static RemoteButton s_last_floor_btn = BTN_NONE;
 static RemoteButton s_last_control_btn = BTN_NONE;
 static constexpr uint16_t kManualSpinRpm = 300;
+static constexpr uint16_t kManualSpinReleaseGraceMs = 150;
+static constexpr uint16_t kManualSpinRampMs = 300;
+static uint32_t s_manual_spin_last_hold_ms = 0;
+static uint32_t s_manual_spin_press_start_ms = 0;
+static uint32_t s_manual_spin_decel_start_ms = 0;
+static uint16_t s_manual_spin_decel_start_rpm = 0;
+static uint16_t s_manual_spin_current_rpm = 0;
 
 static void apply_led_override(uint8_t pattern_id);
 static bool mode_is(uint8_t mode);
 static void ensure_modules_for_mode(uint8_t mode);
 static void set_runtime_mode(uint8_t mode);
+static uint16_t calc_ramp_up_rpm(uint32_t now_ms);
+static uint16_t calc_ramp_down_rpm(uint32_t now_ms);
+static void command_manual_spin(int8_t dir, uint16_t rpm);
 
 static void apply_led_override(uint8_t pattern_id) {
   switch (pattern_id) {
@@ -75,6 +85,30 @@ static void set_runtime_mode(uint8_t mode) {
   ensure_modules_for_mode(mode);
   if (mode == 0) scene_setup();
   s_log.print_mode_change(prev_mode, s_runtime_mode);
+}
+
+static uint16_t calc_ramp_up_rpm(uint32_t now_ms) {
+  const uint32_t elapsed = now_ms - s_manual_spin_press_start_ms;
+  if (elapsed >= kManualSpinRampMs) return kManualSpinRpm;
+  const uint32_t rpm = ((uint32_t)kManualSpinRpm * elapsed) / kManualSpinRampMs;
+  return (uint16_t)((rpm == 0) ? 1 : rpm);
+}
+
+static uint16_t calc_ramp_down_rpm(uint32_t now_ms) {
+  const uint32_t elapsed = now_ms - s_manual_spin_decel_start_ms;
+  if (elapsed >= kManualSpinRampMs) return 0;
+  const uint32_t remain = kManualSpinRampMs - elapsed;
+  const uint32_t rpm = ((uint32_t)s_manual_spin_decel_start_rpm * remain) / kManualSpinRampMs;
+  return (uint16_t)rpm;
+}
+
+static void command_manual_spin(int8_t dir, uint16_t rpm) {
+  if (rpm == 0) return;
+  if (dir > 0) {
+    elevator_command_spin_cw(rpm);
+  } else if (dir < 0) {
+    elevator_command_spin_ccw(rpm);
+  }
 }
 
 void setup() {
@@ -141,6 +175,9 @@ void loop() {
         }
         s_last_floor_btn = current_btn;
         s_manual_spin_dir = 0;
+        s_manual_spin_current_rpm = 0;
+        s_manual_spin_decel_start_ms = 0;
+        s_manual_spin_decel_start_rpm = 0;
       } else if (!floor_btn_pressed) {
         s_last_floor_btn = BTN_NONE;
       }
@@ -157,24 +194,53 @@ void loop() {
         }
         s_last_control_btn = current_btn;
         s_manual_spin_dir = 0;
+        s_manual_spin_current_rpm = 0;
+        s_manual_spin_decel_start_ms = 0;
+        s_manual_spin_decel_start_rpm = 0;
       } else if (!control_btn_pressed) {
         s_last_control_btn = BTN_NONE;
       }
 
       if (prev_pressed && !next_pressed) {
+        s_manual_spin_last_hold_ms = now_ms;
+        s_manual_spin_decel_start_ms = 0;
+        s_manual_spin_decel_start_rpm = 0;
         if (s_manual_spin_dir != 1) {
-          elevator_command_spin_cw(kManualSpinRpm);
           s_manual_spin_dir = 1;
+          s_manual_spin_press_start_ms = now_ms;
         }
+        const uint16_t ramp_rpm = calc_ramp_up_rpm(now_ms);
+        command_manual_spin(1, ramp_rpm);
+        s_manual_spin_current_rpm = ramp_rpm;
       } else if (next_pressed && !prev_pressed) {
+        s_manual_spin_last_hold_ms = now_ms;
+        s_manual_spin_decel_start_ms = 0;
+        s_manual_spin_decel_start_rpm = 0;
         if (s_manual_spin_dir != -1) {
-          elevator_command_spin_ccw(kManualSpinRpm);
           s_manual_spin_dir = -1;
+          s_manual_spin_press_start_ms = now_ms;
         }
+        const uint16_t ramp_rpm = calc_ramp_up_rpm(now_ms);
+        command_manual_spin(-1, ramp_rpm);
+        s_manual_spin_current_rpm = ramp_rpm;
       } else if (!floor_btn_pressed && (current_btn == BTN_NONE || prev_released || next_released) &&
-                 s_manual_spin_dir != 0) {
-        elevator_stop();
-        s_manual_spin_dir = 0;
+                 s_manual_spin_dir != 0 &&
+                 (uint32_t)(now_ms - s_manual_spin_last_hold_ms) >= kManualSpinReleaseGraceMs) {
+        if (s_manual_spin_decel_start_ms == 0) {
+          s_manual_spin_decel_start_ms = now_ms;
+          s_manual_spin_decel_start_rpm = (s_manual_spin_current_rpm > 0) ? s_manual_spin_current_rpm : kManualSpinRpm;
+        }
+        const uint16_t decel_rpm = calc_ramp_down_rpm(now_ms);
+        if (decel_rpm > 0) {
+          command_manual_spin(s_manual_spin_dir, decel_rpm);
+          s_manual_spin_current_rpm = decel_rpm;
+        } else {
+          elevator_stop();
+          s_manual_spin_dir = 0;
+          s_manual_spin_current_rpm = 0;
+          s_manual_spin_decel_start_ms = 0;
+          s_manual_spin_decel_start_rpm = 0;
+        }
       }
     }
   }
