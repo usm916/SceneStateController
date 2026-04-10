@@ -113,6 +113,11 @@ void begin_spin(int8_t dir, uint16_t rpm) {
   const float spin_speed = rpm_to_steps_per_sec(rpm);
   if (spin_speed <= 0.0f) return;
 
+  if (s_spin_mode && s_spin_dir == dir && !s_homing.active) {
+    s_stepper.setMaxSpeed(spin_speed);
+    return;
+  }
+
   s_spin_mode = true;
   s_position_mode = false;
   s_spin_dir = dir;
