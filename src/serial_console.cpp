@@ -3,6 +3,7 @@
 #include "console_logger.h"
 #include "elevator_module.h"
 #include "ir_module.h"
+#include "scene_controller.h"
 #include "shared_serial.h"
 #include "tmc2209_module.h"
 #include <stdlib.h>
@@ -19,6 +20,45 @@ bool parse_int(const char* s, int32_t& out) {
   if (endp == s) return false;
   out = (int32_t)v;
   return true;
+}
+
+void print_system_info() {
+  Serial.println("=== SSC INFO ===");
+  Serial.print("scene=");
+  Serial.println(scene_name(scene_current()));
+  Serial.print("elevator_state=");
+  Serial.println(ev_state_name(elevator_state()));
+  Serial.print("floor_current=");
+  Serial.println(elevator_floor());
+  Serial.print("floor_target=");
+  Serial.println(elevator_target_floor());
+  Serial.print("pos_current_steps=");
+  Serial.println(elevator_current_position_steps());
+  Serial.print("pos_target_steps=");
+  Serial.println(elevator_target_position_steps());
+  Serial.print("distance_to_go_steps=");
+  Serial.println(elevator_distance_to_go_steps());
+  Serial.print("moving=");
+  Serial.println(elevator_is_moving() ? 1 : 0);
+  Serial.print("calibration_valid=");
+  Serial.println(elevator_has_valid_calibration() ? 1 : 0);
+  Serial.print("calibration_in_progress=");
+  Serial.println(elevator_calibration_in_progress() ? 1 : 0);
+  Serial.print("homed_zero=");
+  Serial.println(elevator_is_homed_zero() ? 1 : 0);
+  Serial.print("top_limit_steps=");
+  Serial.println(elevator_top_limit_steps());
+  Serial.print("top_margin_steps=");
+  Serial.println(elevator_top_margin_steps());
+  Serial.print("bottom_margin_steps=");
+  Serial.println(elevator_bottom_margin_steps());
+  Serial.print("tmc_motor_current_ma=");
+  Serial.println(tmc2209_motor_current_ma());
+  Serial.print("tmc_run_current_ma=");
+  Serial.println(tmc2209_run_current_ma());
+  Serial.print("tmc_hold_current_pct=");
+  Serial.println(tmc2209_hold_current_pct());
+  Serial.println("=== /SSC INFO ===");
 }
 
 bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
@@ -90,6 +130,11 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     Serial.println(tmc2209_run_current_ma());
     Serial.print("TMC hold_current(%)=");
     Serial.println(tmc2209_hold_current_pct());
+    return false;
+  }
+  if ((len == 4 && strncmp(line, "INFO", 4) == 0) ||
+      (len == 4 && strncmp(line, "info", 4) == 0)) {
+    print_system_info();
     return false;
   }
   if (len >= sizeof(s_serial_line) - 1) {

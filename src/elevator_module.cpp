@@ -358,6 +358,14 @@ bool elevator_calibration_in_progress() { return s_calibration_armed || s_state 
 bool elevator_has_valid_calibration() { return s_has_calibration; }
 
 int32_t elevator_top_limit_steps() { return s_top_limit_steps; }
+int32_t elevator_top_margin_steps() { return s_top_margin_steps; }
+int32_t elevator_bottom_margin_steps() { return s_bottom_margin_steps; }
+bool elevator_is_homed_zero() { return s_is_homed_zero; }
+int32_t elevator_target_floor() { return s_target_floor; }
+int32_t elevator_current_position_steps() { return s_stepper.currentPosition(); }
+int32_t elevator_target_position_steps() { return s_stepper.targetPosition(); }
+int32_t elevator_distance_to_go_steps() { return s_stepper.distanceToGo(); }
+bool elevator_is_moving() { return s_move_active; }
 
 void elevator_stop() {
   s_spin_mode = false;
