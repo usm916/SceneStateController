@@ -12,8 +12,8 @@ namespace {
 constexpr uint16_t kMotorFullStepsPerRev = 200;
 constexpr uint8_t kMotorMicrosteps = 16;
 
-constexpr float kMoveMaxSpeedDefault = 8400.0f;
-constexpr float kMoveAccelerationDefault = 2000.0f;
+constexpr float kMoveMaxSpeedDefault = 7500.0f;
+constexpr float kMoveAccelerationDefault = 1300.0f;
 constexpr int32_t kSpinHorizonSteps = 32768;
 constexpr int32_t kMaxTravelSteps = 8 * (int32_t)SSC_STEPS_PER_FLOOR;
 
