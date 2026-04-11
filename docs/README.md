@@ -74,8 +74,8 @@ Typical starting points for NEMA17-class steppers:
 #### 2) Integrated モードでIR手動回転
 1. `SSC_MODE` を `0`（Integrated）に設定。
 2. IRリモコンの:
-   - `PREV` 押下: CW回転
-   - `NEXT` 押下: CCW回転
+   - `PREV` 押下: CCW回転
+   - `NEXT` 押下: CW回転
    - どちらも押していない: 減速停止
 
 #### 3) Homing / Calibration（IR）

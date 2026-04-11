@@ -205,23 +205,23 @@ void loop() {
         s_manual_spin_last_hold_ms = now_ms;
         s_manual_spin_decel_start_ms = 0;
         s_manual_spin_decel_start_rpm = 0;
-        if (s_manual_spin_dir != 1) {
-          s_manual_spin_dir = 1;
-          s_manual_spin_press_start_ms = now_ms;
-        }
-        const uint16_t ramp_rpm = calc_ramp_up_rpm(now_ms);
-        command_manual_spin(1, ramp_rpm);
-        s_manual_spin_current_rpm = ramp_rpm;
-      } else if (next_pressed && !prev_pressed) {
-        s_manual_spin_last_hold_ms = now_ms;
-        s_manual_spin_decel_start_ms = 0;
-        s_manual_spin_decel_start_rpm = 0;
         if (s_manual_spin_dir != -1) {
           s_manual_spin_dir = -1;
           s_manual_spin_press_start_ms = now_ms;
         }
         const uint16_t ramp_rpm = calc_ramp_up_rpm(now_ms);
         command_manual_spin(-1, ramp_rpm);
+        s_manual_spin_current_rpm = ramp_rpm;
+      } else if (next_pressed && !prev_pressed) {
+        s_manual_spin_last_hold_ms = now_ms;
+        s_manual_spin_decel_start_ms = 0;
+        s_manual_spin_decel_start_rpm = 0;
+        if (s_manual_spin_dir != 1) {
+          s_manual_spin_dir = 1;
+          s_manual_spin_press_start_ms = now_ms;
+        }
+        const uint16_t ramp_rpm = calc_ramp_up_rpm(now_ms);
+        command_manual_spin(1, ramp_rpm);
         s_manual_spin_current_rpm = ramp_rpm;
       } else if (!floor_btn_pressed && (current_btn == BTN_NONE || prev_released || next_released) &&
                  s_manual_spin_dir != 0 &&
