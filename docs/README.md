@@ -43,6 +43,36 @@ If you want endstops without internal pull-up:
 - `TMC HOLD <0..100>`: hold current percentage relative to run current.
 - `TMC INFO`: prints current settings.
 
+## INFO系コマンド一覧（Serial）
+
+ステータス確認で使うコマンドをここにまとめます。
+
+- `INFO` / `info`
+  システムの統合ステータスを表示します。主な出力:
+  - scene / elevator_state
+  - floor_current / floor_target
+  - pos_current_steps / pos_target_steps / distance_to_go_steps
+  - moving
+  - motor_lag_*（監視値）
+  - calibration_* / homed_zero / top_limit_steps / top_margin_steps / bottom_margin_steps
+  - tmc_motor_current_ma / tmc_run_current_ma / tmc_hold_current_pct
+  - move_max_speed_steps_per_sec / move_accel_steps_per_sec2
+  - button preset情報（btn_zero_steps, btn_0..btn_9 の登録状態と値）
+
+- `TMC INFO`
+  TMC2209 の電流設定だけを簡易表示します。
+
+### 併用する設定コマンド（INFOで反映確認）
+- `mute`
+- `rec_<btn>`
+- `rec_<btn>_<steps>`
+- `save_pref`
+- `speed_<steps_per_sec>`
+- `accel_<steps_per_sec2>`
+- `TMC MOTOR <mA>`
+- `TMC RUN <mA>`
+- `TMC HOLD <0..100>`
+
 Meaning of values:
 - `motor_current` / `run_current`: TMC2209 coil RMS current in mA.
 - `hold_current`: percentage used while stopped; lower values reduce heat.

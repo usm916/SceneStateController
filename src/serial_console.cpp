@@ -91,6 +91,10 @@ void print_system_info() {
   Serial.println(tmc2209_run_current_ma());
   Serial.print("tmc_hold_current_pct=");
   Serial.println(tmc2209_hold_current_pct());
+  Serial.print("move_max_speed_steps_per_sec=");
+  Serial.println(elevator_move_max_speed());
+  Serial.print("move_accel_steps_per_sec2=");
+  Serial.println(elevator_move_acceleration());
   button_position_store_print_info(Serial);
   Serial.println("=== /SSC INFO ===");
 }
@@ -179,8 +183,37 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
   }
   if ((len == 9 && strncmp(line, "save_pref", 9) == 0) ||
       (len == 9 && strncmp(line, "SAVE_PREF", 9) == 0)) {
-    const bool saved = button_position_store_save();
-    Serial.println(saved ? "save_pref:ok" : "save_pref:failed");
+    const bool btn_saved = button_position_store_save();
+    const bool motion_saved = elevator_save_motion_profile();
+    Serial.println((btn_saved && motion_saved) ? "save_pref:ok" : "save_pref:failed");
+    return false;
+  }
+  if ((len >= 7 && strncmp(line, "speed_", 6) == 0) ||
+      (len >= 7 && strncmp(line, "SPEED_", 6) == 0)) {
+    int32_t speed = 0;
+    if (parse_int(line + 6, speed) && speed > 0) {
+      if (elevator_set_move_max_speed((float)speed)) {
+        (void)elevator_save_motion_profile();
+        Serial.print("speed=");
+        Serial.println((int32_t)elevator_move_max_speed());
+      }
+      return false;
+    }
+    Serial.println("speed format: speed_<steps_per_sec>");
+    return false;
+  }
+  if ((len >= 7 && strncmp(line, "accel_", 6) == 0) ||
+      (len >= 7 && strncmp(line, "ACCEL_", 6) == 0)) {
+    int32_t accel = 0;
+    if (parse_int(line + 6, accel) && accel > 0) {
+      if (elevator_set_move_acceleration((float)accel)) {
+        (void)elevator_save_motion_profile();
+        Serial.print("accel=");
+        Serial.println((int32_t)elevator_move_acceleration());
+      }
+      return false;
+    }
+    Serial.println("accel format: accel_<steps_per_sec2>");
     return false;
   }
   if ((len >= 5 && strncmp(line, "rec_", 4) == 0) ||

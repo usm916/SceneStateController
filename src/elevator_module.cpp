@@ -9,9 +9,6 @@
 #include <TMCStepper.h>
 
 namespace {
-constexpr uint16_t kMotorFullStepsPerRev = 200;
-constexpr uint8_t kMotorMicrosteps = 16;
-
 constexpr float kMoveMaxSpeedDefault = 7500.0f;
 constexpr float kMoveAccelerationDefault = 1300.0f;
 constexpr int32_t kSpinHorizonSteps = 32768;
@@ -27,6 +24,8 @@ constexpr char kPrefsKeyVersion[] = "ver";
 constexpr char kPrefsKeyTopStep[] = "top_step";
 constexpr char kPrefsKeyTopMargin[] = "top_margin";
 constexpr char kPrefsKeyBottomMargin[] = "btm_margin";
+constexpr char kPrefsKeyMoveMaxSpeed[] = "move_spd";
+constexpr char kPrefsKeyMoveAccel[] = "move_acc";
 constexpr uint32_t kCalibVersion = 2;
 
 HardwareSerial& s_tmc_serial = Serial1;
@@ -61,6 +60,8 @@ uint32_t s_motor_lag_last_interval_ms = 0;
 uint32_t s_motor_lag_max_interval_ms = 0;
 uint32_t s_motor_lag_accumulated_ms = 0;
 uint32_t s_motor_lag_last_warn_ms = 0;
+float s_move_max_speed = kMoveMaxSpeedDefault;
+float s_move_acceleration = kMoveAccelerationDefault;
 
 struct HomingSession {
   bool active = false;
@@ -77,10 +78,6 @@ struct HomingSession {
 };
 
 HomingSession s_homing;
-
-float rpm_to_steps_per_sec(uint16_t rpm) {
-  return ((float)rpm * (float)kMotorFullStepsPerRev * (float)kMotorMicrosteps) / 60.0f;
-}
 
 bool endstop_hit_up_no_pullup() {
   return digitalRead(SSC_PIN_ENDSTOP_UP) == HIGH;
@@ -117,8 +114,8 @@ void zero_at_bottom_endstop() {
   s_is_homed_zero = true;
 }
 
-void begin_spin(int8_t dir, uint16_t rpm) {
-  const float spin_speed = rpm_to_steps_per_sec(rpm);
+void begin_spin(int8_t dir, uint16_t speed_steps_per_sec) {
+  const float spin_speed = (float)speed_steps_per_sec;
   if (spin_speed <= 0.0f) return;
 
   if (s_spin_mode && s_spin_dir == dir && !s_homing.active) {
@@ -189,8 +186,8 @@ void load_calibration() {
 }
 
 void configure_motion_defaults() {
-  s_stepper.setMaxSpeed(kMoveMaxSpeedDefault);
-  s_stepper.setAcceleration(kMoveAccelerationDefault);
+  s_stepper.setMaxSpeed(s_move_max_speed);
+  s_stepper.setAcceleration(s_move_acceleration);
 }
 
 void begin_homing(bool toward_top, bool capture_for_calibration) {
@@ -387,7 +384,7 @@ void elevator_setup() {
   s_driver.I_scale_analog(false);
   s_driver.toff(SSC_TMC_TOFF);
   s_driver.blank_time(SSC_TMC_BLANK_TIME);
-  s_driver.rms_current(SSC_TMC_RMS_CURRENT_MA, SSC_TMC_RMS_HOLD_MULT);
+  s_driver.rms_current(SSC_TMC_MOTOR_CURRENT_MA, SSC_TMC_HOLD_CURRENT_MULT);
   s_driver.microsteps(SSC_TMC_MICROSTEPS);
   s_driver.en_spreadCycle(SSC_TMC_ENABLE_SPREADCYCLE != 0);
   s_driver.TPWMTHRS(SSC_TMC_TPWMTHRS);
@@ -396,6 +393,8 @@ void elevator_setup() {
   s_stepper.setCurrentPosition(0);
 
   load_calibration();
+  elevator_load_motion_profile();
+  configure_motion_defaults();
 
   s_state = EV_IDLE;
   s_move_active = false;
@@ -431,6 +430,49 @@ uint32_t elevator_motor_lag_count() { return s_motor_lag_count; }
 uint32_t elevator_motor_lag_last_interval_ms() { return s_motor_lag_last_interval_ms; }
 uint32_t elevator_motor_lag_max_interval_ms() { return s_motor_lag_max_interval_ms; }
 uint32_t elevator_motor_lag_accumulated_ms() { return s_motor_lag_accumulated_ms; }
+
+bool elevator_set_move_max_speed(float speed_steps_per_sec) {
+  if (speed_steps_per_sec <= 0.0f) return false;
+  s_move_max_speed = speed_steps_per_sec;
+  s_stepper.setMaxSpeed(s_move_max_speed);
+  return true;
+}
+
+bool elevator_set_move_acceleration(float accel_steps_per_sec2) {
+  if (accel_steps_per_sec2 <= 0.0f) return false;
+  s_move_acceleration = accel_steps_per_sec2;
+  s_stepper.setAcceleration(s_move_acceleration);
+  return true;
+}
+
+float elevator_move_max_speed() {
+  return s_move_max_speed;
+}
+
+float elevator_move_acceleration() {
+  return s_move_acceleration;
+}
+
+bool elevator_save_motion_profile() {
+  if (!s_prefs.begin(kPrefsNs, false)) return false;
+  s_prefs.putFloat(kPrefsKeyMoveMaxSpeed, s_move_max_speed);
+  s_prefs.putFloat(kPrefsKeyMoveAccel, s_move_acceleration);
+  s_prefs.end();
+  return true;
+}
+
+bool elevator_load_motion_profile() {
+  s_move_max_speed = kMoveMaxSpeedDefault;
+  s_move_acceleration = kMoveAccelerationDefault;
+  if (!s_prefs.begin(kPrefsNs, true)) return false;
+  const float loaded_speed = s_prefs.getFloat(kPrefsKeyMoveMaxSpeed, kMoveMaxSpeedDefault);
+  const float loaded_accel = s_prefs.getFloat(kPrefsKeyMoveAccel, kMoveAccelerationDefault);
+  s_prefs.end();
+
+  if (loaded_speed > 0.0f) s_move_max_speed = loaded_speed;
+  if (loaded_accel > 0.0f) s_move_acceleration = loaded_accel;
+  return true;
+}
 
 void elevator_stop() {
   s_spin_mode = false;
@@ -508,12 +550,12 @@ void elevator_command_move_to(int32_t target_floor) {
   handleInput(target_floor * (int32_t)SSC_STEPS_PER_FLOOR);
 }
 
-void elevator_command_spin_cw(uint16_t rpm) {
-  begin_spin(1, rpm);
+void elevator_command_spin_cw(uint16_t speed_steps_per_sec) {
+  begin_spin(1, speed_steps_per_sec);
 }
 
-void elevator_command_spin_ccw(uint16_t rpm) {
-  begin_spin(-1, rpm);
+void elevator_command_spin_ccw(uint16_t speed_steps_per_sec) {
+  begin_spin(-1, speed_steps_per_sec);
 }
 
 void elevator_command_home_zero() {

@@ -23,22 +23,22 @@ static bool s_scene_ready = false;
 static int8_t s_manual_spin_dir = 0;
 static RemoteButton s_last_floor_btn = BTN_NONE;
 static RemoteButton s_last_control_btn = BTN_NONE;
-static constexpr uint16_t kManualSpinRpm = 130;
+static constexpr uint16_t kManualSpinSpeedStepsPerSec = 7000;
 static constexpr uint16_t kManualSpinReleaseGraceMs = 150;
 static constexpr uint16_t kManualSpinRampMs = 500;
 static uint32_t s_manual_spin_last_hold_ms = 0;
 static uint32_t s_manual_spin_press_start_ms = 0;
 static uint32_t s_manual_spin_decel_start_ms = 0;
-static uint16_t s_manual_spin_decel_start_rpm = 0;
-static uint16_t s_manual_spin_current_rpm = 0;
+static uint16_t s_manual_spin_decel_start_speed = 0;
+static uint16_t s_manual_spin_current_speed = 0;
 
 static void apply_led_override(uint8_t pattern_id);
 static bool mode_is(uint8_t mode);
 static void ensure_modules_for_mode(uint8_t mode);
 static void set_runtime_mode(uint8_t mode);
-static uint16_t calc_ramp_up_rpm(uint32_t now_ms);
-static uint16_t calc_ramp_down_rpm(uint32_t now_ms);
-static void command_manual_spin(int8_t dir, uint16_t rpm);
+static uint16_t calc_ramp_up_speed(uint32_t now_ms);
+static uint16_t calc_ramp_down_speed(uint32_t now_ms);
+static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
 
 static void apply_led_override(uint8_t pattern_id) {
   switch (pattern_id) {
@@ -88,27 +88,27 @@ static void set_runtime_mode(uint8_t mode) {
   s_log.print_mode_change(prev_mode, s_runtime_mode);
 }
 
-static uint16_t calc_ramp_up_rpm(uint32_t now_ms) {
+static uint16_t calc_ramp_up_speed(uint32_t now_ms) {
   const uint32_t elapsed = now_ms - s_manual_spin_press_start_ms;
-  if (elapsed >= kManualSpinRampMs) return kManualSpinRpm;
-  const uint32_t rpm = ((uint32_t)kManualSpinRpm * elapsed) / kManualSpinRampMs;
-  return (uint16_t)((rpm == 0) ? 1 : rpm);
+  if (elapsed >= kManualSpinRampMs) return kManualSpinSpeedStepsPerSec;
+  const uint32_t speed = ((uint32_t)kManualSpinSpeedStepsPerSec * elapsed) / kManualSpinRampMs;
+  return (uint16_t)((speed == 0) ? 1 : speed);
 }
 
-static uint16_t calc_ramp_down_rpm(uint32_t now_ms) {
+static uint16_t calc_ramp_down_speed(uint32_t now_ms) {
   const uint32_t elapsed = now_ms - s_manual_spin_decel_start_ms;
   if (elapsed >= kManualSpinRampMs) return 0;
   const uint32_t remain = kManualSpinRampMs - elapsed;
-  const uint32_t rpm = ((uint32_t)s_manual_spin_decel_start_rpm * remain) / kManualSpinRampMs;
-  return (uint16_t)rpm;
+  const uint32_t speed = ((uint32_t)s_manual_spin_decel_start_speed * remain) / kManualSpinRampMs;
+  return (uint16_t)speed;
 }
 
-static void command_manual_spin(int8_t dir, uint16_t rpm) {
-  if (rpm == 0) return;
+static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec) {
+  if (speed_steps_per_sec == 0) return;
   if (dir > 0) {
-    elevator_command_spin_cw(rpm);
+    elevator_command_spin_cw(speed_steps_per_sec);
   } else if (dir < 0) {
-    elevator_command_spin_ccw(rpm);
+    elevator_command_spin_ccw(speed_steps_per_sec);
   }
 }
 
@@ -179,9 +179,9 @@ void loop() {
         }
         s_last_floor_btn = current_btn;
         s_manual_spin_dir = 0;
-        s_manual_spin_current_rpm = 0;
+        s_manual_spin_current_speed = 0;
         s_manual_spin_decel_start_ms = 0;
-        s_manual_spin_decel_start_rpm = 0;
+        s_manual_spin_decel_start_speed = 0;
       } else if (!floor_btn_pressed) {
         s_last_floor_btn = BTN_NONE;
       }
@@ -201,9 +201,9 @@ void loop() {
         }
         s_last_control_btn = current_btn;
         s_manual_spin_dir = 0;
-        s_manual_spin_current_rpm = 0;
+        s_manual_spin_current_speed = 0;
         s_manual_spin_decel_start_ms = 0;
-        s_manual_spin_decel_start_rpm = 0;
+        s_manual_spin_decel_start_speed = 0;
       } else if (!control_btn_pressed) {
         s_last_control_btn = BTN_NONE;
       }
@@ -211,42 +211,43 @@ void loop() {
       if (prev_pressed && !next_pressed) {
         s_manual_spin_last_hold_ms = now_ms;
         s_manual_spin_decel_start_ms = 0;
-        s_manual_spin_decel_start_rpm = 0;
+        s_manual_spin_decel_start_speed = 0;
         if (s_manual_spin_dir != -1) {
           s_manual_spin_dir = -1;
           s_manual_spin_press_start_ms = now_ms;
         }
-        const uint16_t ramp_rpm = calc_ramp_up_rpm(now_ms);
-        command_manual_spin(-1, ramp_rpm);
-        s_manual_spin_current_rpm = ramp_rpm;
+        const uint16_t ramp_speed = calc_ramp_up_speed(now_ms);
+        command_manual_spin(-1, ramp_speed);
+        s_manual_spin_current_speed = ramp_speed;
       } else if (next_pressed && !prev_pressed) {
         s_manual_spin_last_hold_ms = now_ms;
         s_manual_spin_decel_start_ms = 0;
-        s_manual_spin_decel_start_rpm = 0;
+        s_manual_spin_decel_start_speed = 0;
         if (s_manual_spin_dir != 1) {
           s_manual_spin_dir = 1;
           s_manual_spin_press_start_ms = now_ms;
         }
-        const uint16_t ramp_rpm = calc_ramp_up_rpm(now_ms);
-        command_manual_spin(1, ramp_rpm);
-        s_manual_spin_current_rpm = ramp_rpm;
+        const uint16_t ramp_speed = calc_ramp_up_speed(now_ms);
+        command_manual_spin(1, ramp_speed);
+        s_manual_spin_current_speed = ramp_speed;
       } else if (!floor_btn_pressed && (current_btn == BTN_NONE || prev_released || next_released) &&
                  s_manual_spin_dir != 0 &&
                  (uint32_t)(now_ms - s_manual_spin_last_hold_ms) >= kManualSpinReleaseGraceMs) {
         if (s_manual_spin_decel_start_ms == 0) {
           s_manual_spin_decel_start_ms = now_ms;
-          s_manual_spin_decel_start_rpm = (s_manual_spin_current_rpm > 0) ? s_manual_spin_current_rpm : kManualSpinRpm;
+          s_manual_spin_decel_start_speed =
+              (s_manual_spin_current_speed > 0) ? s_manual_spin_current_speed : kManualSpinSpeedStepsPerSec;
         }
-        const uint16_t decel_rpm = calc_ramp_down_rpm(now_ms);
-        if (decel_rpm > 0) {
-          command_manual_spin(s_manual_spin_dir, decel_rpm);
-          s_manual_spin_current_rpm = decel_rpm;
+        const uint16_t decel_speed = calc_ramp_down_speed(now_ms);
+        if (decel_speed > 0) {
+          command_manual_spin(s_manual_spin_dir, decel_speed);
+          s_manual_spin_current_speed = decel_speed;
         } else {
           elevator_stop();
           s_manual_spin_dir = 0;
-          s_manual_spin_current_rpm = 0;
+          s_manual_spin_current_speed = 0;
           s_manual_spin_decel_start_ms = 0;
-          s_manual_spin_decel_start_rpm = 0;
+          s_manual_spin_decel_start_speed = 0;
         }
       }
     }
