@@ -40,6 +40,14 @@ void print_system_info() {
   Serial.println(elevator_distance_to_go_steps());
   Serial.print("moving=");
   Serial.println(elevator_is_moving() ? 1 : 0);
+  Serial.print("motor_lag_count=");
+  Serial.println(elevator_motor_lag_count());
+  Serial.print("motor_lag_last_interval_ms=");
+  Serial.println(elevator_motor_lag_last_interval_ms());
+  Serial.print("motor_lag_max_interval_ms=");
+  Serial.println(elevator_motor_lag_max_interval_ms());
+  Serial.print("motor_lag_accumulated_ms=");
+  Serial.println(elevator_motor_lag_accumulated_ms());
   Serial.print("calibration_valid=");
   Serial.println(elevator_has_valid_calibration() ? 1 : 0);
   Serial.print("calibration_in_progress=");
