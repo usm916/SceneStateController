@@ -42,6 +42,8 @@ void ConsoleLogger::print_mode_usage() {
   out_.println("Elevator target (mode 3): e<steps>  (example: e3200)");
   out_.println("TMC usage: TMC MOTOR <mA> | TMC RUN <mA> | TMC HOLD <0..100> | TMC INFO");
   out_.println("System info: INFO");
+  out_.println("Preset cmds: mute | rec_<btn> | rec_<btn>_<steps> | save_pref");
+  out_.println("Motion cmds: speed_<steps/s> | accel_<steps/s2>");
 }
 
 void ConsoleLogger::print_mode_cmd_too_long() {

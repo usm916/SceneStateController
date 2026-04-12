@@ -4,7 +4,7 @@
 #include <TMCStepper.h>
 
 static HardwareSerial& s_ser = Serial1;
-static constexpr float RSENSE = 0.11f;
+static constexpr float RSENSE = SSC_TMC_RSENSE_OHM;
 static TMC2209Stepper s_drv(&s_ser, RSENSE, 0);
 static uint16_t s_motor_current_ma = SSC_TMC_MOTOR_CURRENT_MA;
 static uint8_t s_hold_current_pct = SSC_TMC_HOLD_CURRENT_PCT;
@@ -35,12 +35,12 @@ void tmc2209_setup() {
 void tmc2209_configure_defaults() {
   s_drv.pdn_disable(true);
   s_drv.I_scale_analog(false);
-  s_drv.toff(4);
-  s_drv.blank_time(24);
+  s_drv.toff(SSC_TMC_TOFF);
+  s_drv.blank_time(SSC_TMC_BLANK_TIME);
   apply_current_settings();
-  s_drv.microsteps(16);
-  s_drv.en_spreadCycle(false);
-  s_drv.TPWMTHRS(0);
+  s_drv.microsteps(SSC_TMC_MICROSTEPS);
+  s_drv.en_spreadCycle(SSC_TMC_ENABLE_SPREADCYCLE != 0);
+  s_drv.TPWMTHRS(SSC_TMC_TPWMTHRS);
 }
 
 void tmc2209_set_motor_current_ma(uint16_t current_ma) {
