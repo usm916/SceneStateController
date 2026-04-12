@@ -37,13 +37,15 @@ void ConsoleLogger::print_serial_echo(char c) {
 }
 
 void ConsoleLogger::print_mode_usage() {
+  out_.println("Type help to show this command list.");
   out_.println("MODE_CMD usage: s0..s4");
   out_.println("IR decode mode: m0..m3");
   out_.println("Elevator target (mode 3): e<steps>  (example: e3200)");
-  out_.println("TMC usage: TMC MOTOR <mA> | TMC RUN <mA> | TMC HOLD <0..100> | TMC INFO");
+  out_.println("TMC usage: TMC RUN <mA> | TMC HOLD <0..100> | TMC INFO");
   out_.println("System info: INFO");
   out_.println("Preset cmds: mute | rec_<btn> | rec_<btn>_<steps> | save_pref");
   out_.println("Motion cmds: speed_<steps/s> | accel_<steps/s2>");
+  out_.println("Manual prev/next max speed follows speed_<steps/s>");
 }
 
 void ConsoleLogger::print_mode_cmd_too_long() {
