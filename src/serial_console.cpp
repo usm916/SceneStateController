@@ -6,6 +6,7 @@
 #include "scene_controller.h"
 #include "shared_serial.h"
 #include "tmc2209_module.h"
+#include "button_position_store.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -20,6 +21,30 @@ bool parse_int(const char* s, int32_t& out) {
   if (endp == s) return false;
   out = (int32_t)v;
   return true;
+}
+
+bool parse_rec_command(const char* line, uint8_t len, uint8_t* out_index,
+                       int32_t* out_relative_steps, bool* out_has_relative) {
+  if (line == nullptr || out_index == nullptr || out_relative_steps == nullptr || out_has_relative == nullptr) return false;
+  if (len < 5 || strncmp(line, "rec_", 4) != 0) return false;
+
+  const char* payload = line + 4;
+  const char* sep = strchr(payload, '_');
+
+  char btn_token[12] = {0};
+  if (sep == nullptr) {
+    strncpy(btn_token, payload, sizeof(btn_token) - 1);
+    *out_has_relative = false;
+  } else {
+    const size_t btn_len = (size_t)(sep - payload);
+    if (btn_len == 0 || btn_len >= sizeof(btn_token)) return false;
+    memcpy(btn_token, payload, btn_len);
+    btn_token[btn_len] = '\0';
+    *out_has_relative = true;
+    if (!parse_int(sep + 1, *out_relative_steps)) return false;
+  }
+
+  return button_position_store_parse_button_token(btn_token, out_index);
 }
 
 void print_system_info() {
@@ -66,6 +91,7 @@ void print_system_info() {
   Serial.println(tmc2209_run_current_ma());
   Serial.print("tmc_hold_current_pct=");
   Serial.println(tmc2209_hold_current_pct());
+  button_position_store_print_info(Serial);
   Serial.println("=== /SSC INFO ===");
 }
 
@@ -143,6 +169,48 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
   if ((len == 4 && strncmp(line, "INFO", 4) == 0) ||
       (len == 4 && strncmp(line, "info", 4) == 0)) {
     print_system_info();
+    return false;
+  }
+  if ((len == 4 && strncmp(line, "mute", 4) == 0) ||
+      (len == 4 && strncmp(line, "MUTE", 4) == 0)) {
+    button_position_store_set_zero(elevator_current_position_steps());
+    Serial.println("mute: current position set to zero base.");
+    return false;
+  }
+  if ((len == 9 && strncmp(line, "save_pref", 9) == 0) ||
+      (len == 9 && strncmp(line, "SAVE_PREF", 9) == 0)) {
+    const bool saved = button_position_store_save();
+    Serial.println(saved ? "save_pref:ok" : "save_pref:failed");
+    return false;
+  }
+  if ((len >= 5 && strncmp(line, "rec_", 4) == 0) ||
+      (len >= 5 && strncmp(line, "REC_", 4) == 0)) {
+    char normalized[24] = {0};
+    const uint8_t max_len = (len < sizeof(normalized) - 1) ? len : (sizeof(normalized) - 1);
+    for (uint8_t i = 0; i < max_len; ++i) {
+      char c = line[i];
+      if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+      normalized[i] = c;
+    }
+
+    uint8_t btn_index = 0;
+    int32_t relative_steps = 0;
+    bool has_relative = false;
+    if (parse_rec_command(normalized, (uint8_t)strlen(normalized), &btn_index, &relative_steps, &has_relative)) {
+      if (has_relative) {
+        button_position_store_record_relative(btn_index, relative_steps);
+      } else {
+        button_position_store_record_current(btn_index, elevator_current_position_steps());
+        button_position_store_relative(btn_index, &relative_steps);
+      }
+      Serial.print("rec_");
+      Serial.print(btn_index);
+      Serial.print("=");
+      Serial.println(relative_steps);
+      return false;
+    }
+
+    Serial.println("rec format: rec_<0..9> or rec_<0..9>_<steps> (BTN_x accepted)");
     return false;
   }
   if (len >= sizeof(s_serial_line) - 1) {
