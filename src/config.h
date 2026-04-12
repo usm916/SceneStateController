@@ -60,3 +60,16 @@
 #define SSC_TMC_MICROSTEPS 16
 #define SSC_TMC_ENABLE_SPREADCYCLE 0
 #define SSC_TMC_TPWMTHRS 0
+
+// Motor lag monitoring (lightweight loop delay watchdog)
+#ifndef SSC_MOTOR_LAG_MONITOR_ENABLE
+#define SSC_MOTOR_LAG_MONITOR_ENABLE 1
+#endif
+
+#ifndef SSC_MOTOR_LAG_WARN_THRESHOLD_MS
+#define SSC_MOTOR_LAG_WARN_THRESHOLD_MS 35
+#endif
+
+#ifndef SSC_MOTOR_LAG_WARN_MIN_INTERVAL_MS
+#define SSC_MOTOR_LAG_WARN_MIN_INTERVAL_MS 1000
+#endif

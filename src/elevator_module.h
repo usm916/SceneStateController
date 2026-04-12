@@ -28,3 +28,7 @@ int32_t elevator_current_position_steps();
 int32_t elevator_target_position_steps();
 int32_t elevator_distance_to_go_steps();
 bool elevator_is_moving();
+uint32_t elevator_motor_lag_count();
+uint32_t elevator_motor_lag_last_interval_ms();
+uint32_t elevator_motor_lag_max_interval_ms();
+uint32_t elevator_motor_lag_accumulated_ms();

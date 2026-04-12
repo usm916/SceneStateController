@@ -19,6 +19,8 @@ constexpr int32_t kMaxTravelSteps = 8 * (int32_t)SSC_STEPS_PER_FLOOR;
 
 constexpr float kHomingFastSpeed = 4200.0f;
 constexpr float kHomingSlowSpeed = 900.0f;
+constexpr uint32_t kMotorLagWarnThresholdMs = SSC_MOTOR_LAG_WARN_THRESHOLD_MS;
+constexpr uint32_t kMotorLagWarnMinIntervalMs = SSC_MOTOR_LAG_WARN_MIN_INTERVAL_MS;
 
 constexpr char kPrefsNs[] = "ev_calib";
 constexpr char kPrefsKeyVersion[] = "ver";
@@ -53,6 +55,12 @@ int32_t s_bottom_margin_steps = 0;
 uint32_t s_move_start_ms = 0;
 uint32_t s_last_check_ms = 0;
 uint32_t s_move_timeout_ms = 20000;
+uint32_t s_last_motor_tick_ms = 0;
+uint32_t s_motor_lag_count = 0;
+uint32_t s_motor_lag_last_interval_ms = 0;
+uint32_t s_motor_lag_max_interval_ms = 0;
+uint32_t s_motor_lag_accumulated_ms = 0;
+uint32_t s_motor_lag_last_warn_ms = 0;
 
 struct HomingSession {
   bool active = false;
@@ -311,6 +319,48 @@ void emergency_stop_with_error(uint32_t now_ms, Event* out_event, int32_t error_
     out_event->data.error_code = error_code;
   }
 }
+
+void monitor_motor_tick_interval(uint32_t now_ms) {
+#if !SSC_MOTOR_LAG_MONITOR_ENABLE
+  (void)now_ms;
+  return;
+#else
+  if (s_last_motor_tick_ms == 0) {
+    s_last_motor_tick_ms = now_ms;
+    return;
+  }
+
+  const uint32_t tick_interval_ms = now_ms - s_last_motor_tick_ms;
+  s_last_motor_tick_ms = now_ms;
+
+  if (!s_move_active && !s_homing.active) return;
+  if (tick_interval_ms <= kMotorLagWarnThresholdMs) return;
+
+  s_motor_lag_count++;
+  s_motor_lag_last_interval_ms = tick_interval_ms;
+  if (tick_interval_ms > s_motor_lag_max_interval_ms) {
+    s_motor_lag_max_interval_ms = tick_interval_ms;
+  }
+  s_motor_lag_accumulated_ms += (tick_interval_ms - kMotorLagWarnThresholdMs);
+
+  const bool allow_warn =
+      (s_motor_lag_last_warn_ms == 0) || (now_ms - s_motor_lag_last_warn_ms >= kMotorLagWarnMinIntervalMs);
+  if (!allow_warn) return;
+  if (Serial.availableForWrite() < 96) return;
+
+  s_motor_lag_last_warn_ms = now_ms;
+  Serial.print("[MOTOR_LAG] interval_ms=");
+  Serial.print(tick_interval_ms);
+  Serial.print(" state=");
+  Serial.print(ev_state_name(s_state));
+  Serial.print(" pos=");
+  Serial.print(s_stepper.currentPosition());
+  Serial.print(" target=");
+  Serial.print(s_stepper.targetPosition());
+  Serial.print(" dist=");
+  Serial.println(s_stepper.distanceToGo());
+#endif
+}
 }  // namespace
 
 void elevator_setup() {
@@ -352,6 +402,12 @@ void elevator_setup() {
   s_spin_mode = false;
   s_position_mode = false;
   s_homing = {};
+  s_last_motor_tick_ms = 0;
+  s_motor_lag_count = 0;
+  s_motor_lag_last_interval_ms = 0;
+  s_motor_lag_max_interval_ms = 0;
+  s_motor_lag_accumulated_ms = 0;
+  s_motor_lag_last_warn_ms = 0;
 }
 
 EvState elevator_state() { return s_state; }
@@ -371,6 +427,10 @@ int32_t elevator_current_position_steps() { return s_stepper.currentPosition(); 
 int32_t elevator_target_position_steps() { return s_stepper.targetPosition(); }
 int32_t elevator_distance_to_go_steps() { return s_stepper.distanceToGo(); }
 bool elevator_is_moving() { return s_move_active; }
+uint32_t elevator_motor_lag_count() { return s_motor_lag_count; }
+uint32_t elevator_motor_lag_last_interval_ms() { return s_motor_lag_last_interval_ms; }
+uint32_t elevator_motor_lag_max_interval_ms() { return s_motor_lag_max_interval_ms; }
+uint32_t elevator_motor_lag_accumulated_ms() { return s_motor_lag_accumulated_ms; }
 
 void elevator_stop() {
   s_spin_mode = false;
@@ -481,6 +541,7 @@ void elevator_command_emergency_stop() {
 void elevator_tick(uint32_t now_ms, Event* out_event) {
   if (out_event) out_event->type = EVT_NONE;
 
+  monitor_motor_tick_interval(now_ms);
   keep_spin_target_ahead();
   s_stepper.run();
 
