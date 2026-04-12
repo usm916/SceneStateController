@@ -11,6 +11,7 @@
 #include "src/scene_controller.h"
 #include "src/console_logger.h"
 #include "src/shared_serial.h"
+#include "src/button_position_store.h"
 
 static ConsoleLogger s_log(Serial);
 
@@ -118,6 +119,7 @@ void setup() {
 
   shared_serial_setup();
   pi_link_setup();
+  button_position_store_setup();
   s_runtime_mode = SSC_MODE;
   ensure_modules_for_mode(s_runtime_mode);
   s_log.print_startup(s_runtime_mode);
@@ -160,18 +162,20 @@ void loop() {
       const bool next_pressed = (current_btn == BTN_NEXT);
       const bool prev_released = ir_btn_released(BTN_PREV);
       const bool next_released = ir_btn_released(BTN_NEXT);
-      const bool floor_btn_pressed =
-          current_btn == BTN_0 || current_btn == BTN_1 || current_btn == BTN_2 || current_btn == BTN_3;
+      uint8_t floor_btn_index = 0;
+      const bool floor_btn_pressed = button_position_store_index_from_remote(current_btn, &floor_btn_index);
       const bool control_btn_pressed =
-          current_btn == BTN_POWER || current_btn == BTN_EQ || current_btn == BTN_VOL_DOWN || current_btn == BTN_VOL_UP;
+          current_btn == BTN_POWER || current_btn == BTN_EQ || current_btn == BTN_VOL_DOWN || current_btn == BTN_VOL_UP ||
+          current_btn == BTN_MUTE;
 
       if (floor_btn_pressed && current_btn != s_last_floor_btn) {
-        switch (current_btn) {
-          case BTN_0: handleInput(0); break;
-          case BTN_1: handleInput(1 * (int32_t)SSC_STEPS_PER_FLOOR); break;
-          case BTN_2: handleInput(2 * (int32_t)SSC_STEPS_PER_FLOOR); break;
-          case BTN_3: handleInput(3 * (int32_t)SSC_STEPS_PER_FLOOR); break;
-          default: break;
+        int32_t target_steps = 0;
+        if (button_position_store_target(floor_btn_index, &target_steps)) {
+          handleInput(target_steps);
+        } else {
+          Serial.print("BTN_");
+          Serial.print(floor_btn_index);
+          Serial.println(" is not recorded. Use rec_<button> first.");
         }
         s_last_floor_btn = current_btn;
         s_manual_spin_dir = 0;
@@ -191,6 +195,9 @@ void loop() {
           elevator_command_home_zero();
         } else if (current_btn == BTN_VOL_UP) {
           elevator_command_home_top();
+        } else if (current_btn == BTN_MUTE) {
+          button_position_store_set_zero(elevator_current_position_steps());
+          Serial.println("mute: set current position as zero.");
         }
         s_last_control_btn = current_btn;
         s_manual_spin_dir = 0;

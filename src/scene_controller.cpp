@@ -39,13 +39,6 @@ void scene_handle_event(const Event& e) {
         s_target_floor = e.data.move.target_floor;
         elevator_command_move_to(s_target_floor);
         set_scene(SCENE_MOVE);
-      } else if (e.type == EVT_IR_BUTTON) {
-        const RemoteButton btn = (RemoteButton)e.data.ir.cmd;
-        if (btn == BTN_0 || btn == BTN_1 || btn == BTN_2 || btn == BTN_3) {
-          s_target_floor = (int32_t)(btn - BTN_0);
-          elevator_command_move_to(s_target_floor);
-          set_scene(SCENE_MOVE);
-        }
       }
       break;
 
