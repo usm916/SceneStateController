@@ -6,7 +6,7 @@
 static HardwareSerial& s_ser = Serial1;
 static constexpr float RSENSE = SSC_TMC_RSENSE_OHM;
 static TMC2209Stepper s_drv(&s_ser, RSENSE, 0);
-static uint16_t s_motor_current_ma = SSC_TMC_MOTOR_CURRENT_MA;
+static uint16_t s_run_current_ma = SSC_TMC_MOTOR_CURRENT_MA;
 static uint8_t s_hold_current_pct = SSC_TMC_HOLD_CURRENT_PCT;
 
 static uint8_t clamp_hold_pct(uint8_t hold_pct) {
@@ -15,7 +15,7 @@ static uint8_t clamp_hold_pct(uint8_t hold_pct) {
 
 static void apply_current_settings() {
   s_hold_current_pct = clamp_hold_pct(s_hold_current_pct);
-  s_drv.rms_current(s_motor_current_ma, s_hold_current_pct);
+  s_drv.rms_current(s_run_current_ma, s_hold_current_pct);
 }
 
 void tmc2209_setup() {
@@ -43,13 +43,9 @@ void tmc2209_configure_defaults() {
   s_drv.TPWMTHRS(SSC_TMC_TPWMTHRS);
 }
 
-void tmc2209_set_motor_current_ma(uint16_t current_ma) {
-  s_motor_current_ma = current_ma;
-  apply_current_settings();
-}
-
 void tmc2209_set_run_current_ma(uint16_t current_ma) {
-  tmc2209_set_motor_current_ma(current_ma);
+  s_run_current_ma = current_ma;
+  apply_current_settings();
 }
 
 void tmc2209_set_hold_current_pct(uint8_t hold_pct) {
@@ -57,12 +53,8 @@ void tmc2209_set_hold_current_pct(uint8_t hold_pct) {
   apply_current_settings();
 }
 
-uint16_t tmc2209_motor_current_ma() {
-  return s_motor_current_ma;
-}
-
 uint16_t tmc2209_run_current_ma() {
-  return tmc2209_motor_current_ma();
+  return s_run_current_ma;
 }
 
 uint8_t tmc2209_hold_current_pct() {

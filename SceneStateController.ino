@@ -23,7 +23,6 @@ static bool s_scene_ready = false;
 static int8_t s_manual_spin_dir = 0;
 static RemoteButton s_last_floor_btn = BTN_NONE;
 static RemoteButton s_last_control_btn = BTN_NONE;
-static constexpr uint16_t kManualSpinSpeedStepsPerSec = 7000;
 static constexpr uint16_t kManualSpinReleaseGraceMs = 150;
 static constexpr uint16_t kManualSpinRampMs = 500;
 static uint32_t s_manual_spin_last_hold_ms = 0;
@@ -39,6 +38,12 @@ static void set_runtime_mode(uint8_t mode);
 static uint16_t calc_ramp_up_speed(uint32_t now_ms);
 static uint16_t calc_ramp_down_speed(uint32_t now_ms);
 static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
+static uint16_t manual_spin_speed_cap();
+
+static uint16_t manual_spin_speed_cap() {
+  const float move_speed_f = elevator_move_max_speed();
+  return (move_speed_f > 0.0f) ? (uint16_t)move_speed_f : 1;
+}
 
 static void apply_led_override(uint8_t pattern_id) {
   switch (pattern_id) {
@@ -90,8 +95,9 @@ static void set_runtime_mode(uint8_t mode) {
 
 static uint16_t calc_ramp_up_speed(uint32_t now_ms) {
   const uint32_t elapsed = now_ms - s_manual_spin_press_start_ms;
-  if (elapsed >= kManualSpinRampMs) return kManualSpinSpeedStepsPerSec;
-  const uint32_t speed = ((uint32_t)kManualSpinSpeedStepsPerSec * elapsed) / kManualSpinRampMs;
+  const uint16_t max_speed = manual_spin_speed_cap();
+  if (elapsed >= kManualSpinRampMs) return max_speed;
+  const uint32_t speed = ((uint32_t)max_speed * elapsed) / kManualSpinRampMs;
   return (uint16_t)((speed == 0) ? 1 : speed);
 }
 
@@ -236,7 +242,7 @@ void loop() {
         if (s_manual_spin_decel_start_ms == 0) {
           s_manual_spin_decel_start_ms = now_ms;
           s_manual_spin_decel_start_speed =
-              (s_manual_spin_current_speed > 0) ? s_manual_spin_current_speed : kManualSpinSpeedStepsPerSec;
+              (s_manual_spin_current_speed > 0) ? s_manual_spin_current_speed : manual_spin_speed_cap();
         }
         const uint16_t decel_speed = calc_ramp_down_speed(now_ms);
         if (decel_speed > 0) {

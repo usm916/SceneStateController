@@ -85,8 +85,6 @@ void print_system_info() {
   Serial.println(elevator_top_margin_steps());
   Serial.print("bottom_margin_steps=");
   Serial.println(elevator_bottom_margin_steps());
-  Serial.print("tmc_motor_current_ma=");
-  Serial.println(tmc2209_motor_current_ma());
   Serial.print("tmc_run_current_ma=");
   Serial.println(tmc2209_run_current_ma());
   Serial.print("tmc_hold_current_pct=");
@@ -134,15 +132,6 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       return true;
     }
   }
-  if (len >= 11 && strncmp(line, "TMC MOTOR ", 10) == 0) {
-    int32_t current_ma = 0;
-    if (parse_int(line + 10, current_ma) && current_ma > 0 && current_ma <= 2000) {
-      tmc2209_set_motor_current_ma((uint16_t)current_ma);
-      Serial.print("TMC motor_current(mA)=");
-      Serial.println(tmc2209_motor_current_ma());
-      return false;
-    }
-  }
   if (len >= 9 && strncmp(line, "TMC RUN ", 8) == 0) {
     int32_t current_ma = 0;
     if (parse_int(line + 8, current_ma) && current_ma > 0 && current_ma <= 2000) {
@@ -162,8 +151,6 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     }
   }
   if (len == 8 && strncmp(line, "TMC INFO", 8) == 0) {
-    Serial.print("TMC motor_current(mA)=");
-    Serial.println(tmc2209_motor_current_ma());
     Serial.print("TMC run_current(mA)=");
     Serial.println(tmc2209_run_current_ma());
     Serial.print("TMC hold_current(%)=");
@@ -179,6 +166,11 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       (len == 4 && strncmp(line, "MUTE", 4) == 0)) {
     button_position_store_set_zero(elevator_current_position_steps());
     Serial.println("mute: current position set to zero base.");
+    return false;
+  }
+  if ((len == 4 && strncmp(line, "help", 4) == 0) ||
+      (len == 4 && strncmp(line, "HELP", 4) == 0)) {
+    log.print_mode_usage();
     return false;
   }
   if ((len == 9 && strncmp(line, "save_pref", 9) == 0) ||
