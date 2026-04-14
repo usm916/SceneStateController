@@ -6,7 +6,7 @@ static uint8_t s_decode_mode = 0; // 0=AUTO 1=NEC 2=AEHA 3=SONY
 static RemoteButton s_active_btn = BTN_NONE;
 static RemoteButton s_released_btn = BTN_NONE;
 static uint32_t s_active_btn_until_ms = 0;
-static constexpr uint16_t kIrHoldMs = 100;
+static constexpr uint16_t kIrHoldMs = 200;
 
 static void update_button_lifecycle(uint32_t now_ms) {
   if (s_active_btn != BTN_NONE && now_ms > s_active_btn_until_ms) {
