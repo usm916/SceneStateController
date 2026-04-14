@@ -45,6 +45,7 @@ void ConsoleLogger::print_mode_usage() {
   out_.println("System info: INFO");
   out_.println("Preset cmds: mute | rec_<btn> | rec_<btn>_<steps> | save_pref");
   out_.println("Motion cmds: speed_<steps/s> | accel_<steps/s2>");
+  out_.println("Current cmd: current_<1..2000>  (TMC run current mA)");
   out_.println("Manual prev/next max speed follows speed_<steps/s>");
 }
 
