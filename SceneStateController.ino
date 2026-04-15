@@ -2,6 +2,7 @@
 
 #include "src/config.h"
 #include "src/events.h"
+#include "src/WebOtaBlinkApp.h"
 
 #include "src/elevator_module.h"
 #include "src/ir_module.h"
@@ -12,6 +13,8 @@
 #include "src/console_logger.h"
 #include "src/shared_serial.h"
 #include "src/button_position_store.h"
+
+WebOtaBlinkApp app;
 
 static ConsoleLogger s_log(Serial);
 
@@ -121,6 +124,7 @@ static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec) {
 void setup() {
   Serial.begin(SSC_USB_SERIAL_BAUD);
   delay(1200);
+  app.begin();
   s_log.print_banner();
 
   shared_serial_setup();
@@ -132,6 +136,8 @@ void setup() {
 }
 
 void loop() {
+  app.loop();
+
   uint32_t now_ms = millis();
   shared_serial_pump();
   Event serial_event = {EVT_NONE, 0, {}};
