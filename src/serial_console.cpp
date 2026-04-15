@@ -177,7 +177,21 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       (len == 9 && strncmp(line, "SAVE_PREF", 9) == 0)) {
     const bool btn_saved = button_position_store_save();
     const bool motion_saved = elevator_save_motion_profile();
-    Serial.println((btn_saved && motion_saved) ? "save_pref:ok" : "save_pref:failed");
+    const bool tmc_saved = tmc2209_save_current_settings();
+    Serial.println((btn_saved && motion_saved && tmc_saved) ? "save_pref:ok" : "save_pref:failed");
+    return false;
+  }
+  if ((len >= 9 && strncmp(line, "current_", 8) == 0) ||
+      (len >= 9 && strncmp(line, "CURRENT_", 8) == 0)) {
+    int32_t current_ma = 0;
+    if (parse_int(line + 8, current_ma) && current_ma > 0 && current_ma <= 2000) {
+      tmc2209_set_run_current_ma((uint16_t)current_ma);
+      (void)tmc2209_save_current_settings();
+      Serial.print("current_");
+      Serial.println(tmc2209_run_current_ma());
+      return false;
+    }
+    Serial.println("current format: current_<1..2000>");
     return false;
   }
   if ((len >= 7 && strncmp(line, "speed_", 6) == 0) ||
