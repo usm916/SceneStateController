@@ -1,5 +1,8 @@
 #include "WebOtaBlinkApp.h"
 
+#ifndef ELEGANTOTA_USE_ASYNC_WEBSERVER
+#define ELEGANTOTA_USE_ASYNC_WEBSERVER 1
+#endif
 #include <ElegantOTA.h>
 #include <esp_wifi.h>
 
@@ -39,8 +42,10 @@ void WebOtaBlinkApp::begin()
 
 void WebOtaBlinkApp::loop()
 {
-  server_.handleClient();
-  ElegantOTA.loop();
+  if (restartScheduled_ && static_cast<long>(millis() - restartAtMs_) >= 0)
+  {
+    ESP.restart();
+  }
 }
 
 // ------------------------------------------------------------
@@ -254,26 +259,31 @@ void WebOtaBlinkApp::startFallbackAp()
 // ------------------------------------------------------------
 void WebOtaBlinkApp::registerRoutes()
 {
-  server_.on("/", HTTP_GET, [this]() { handleRoot(); });
-  server_.on("/save-wifi", HTTP_POST, [this]() { handleSaveWifi(); });
-  server_.on("/reboot", HTTP_GET, [this]() { handleReboot(); });
-  server_.onNotFound([this]() { handleNotFound(); });
+  server_.on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
+  server_.on("/save-wifi", HTTP_POST,
+             [this](AsyncWebServerRequest* request) { handleSaveWifi(request); });
+  server_.on("/reboot", HTTP_GET,
+             [this](AsyncWebServerRequest* request) { handleReboot(request); });
+  server_.onNotFound([this](AsyncWebServerRequest* request) { handleNotFound(request); });
 }
 
-void WebOtaBlinkApp::handleRoot()
+void WebOtaBlinkApp::handleRoot(AsyncWebServerRequest* request)
 {
-  server_.send(200, "text/html; charset=utf-8", makeHtml());
+  request->send(200, "text/html; charset=utf-8", makeHtml());
 }
 
-void WebOtaBlinkApp::handleSaveWifi()
+void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
 {
   for (int i = 0; i < kMaxWifiSlots; ++i)
   {
     const String ssidKey = "ssid" + String(i);
     const String passKey = "pass" + String(i);
 
-    const String ssid = server_.hasArg(ssidKey) ? server_.arg(ssidKey) : "";
-    const String pass = server_.hasArg(passKey) ? server_.arg(passKey) : "";
+    const AsyncWebParameter* ssidParam = request->getParam(ssidKey, true);
+    const AsyncWebParameter* passParam = request->getParam(passKey, true);
+
+    const String ssid = (ssidParam != nullptr) ? ssidParam->value() : "";
+    const String pass = (passParam != nullptr) ? passParam->value() : "";
 
     memset(wifiSlots_[i].ssid, 0, sizeof(wifiSlots_[i].ssid));
     memset(wifiSlots_[i].pass, 0, sizeof(wifiSlots_[i].pass));
@@ -292,22 +302,22 @@ void WebOtaBlinkApp::handleSaveWifi()
   html += "<p>Device will reboot and retry the Wi-Fi list.</p>";
   html += "</body></html>";
 
-  server_.send(200, "text/html; charset=utf-8", html);
-  delay(800);
-  ESP.restart();
+  request->send(200, "text/html; charset=utf-8", html);
+  restartScheduled_ = true;
+  restartAtMs_ = millis() + 800;
 }
 
-void WebOtaBlinkApp::handleReboot()
+void WebOtaBlinkApp::handleReboot(AsyncWebServerRequest* request)
 {
-  server_.send(200, "text/html; charset=utf-8",
-               "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
-  delay(500);
-  ESP.restart();
+  request->send(200, "text/html; charset=utf-8",
+                "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
+  restartScheduled_ = true;
+  restartAtMs_ = millis() + 500;
 }
 
-void WebOtaBlinkApp::handleNotFound()
+void WebOtaBlinkApp::handleNotFound(AsyncWebServerRequest* request)
 {
-  server_.send(404, "text/plain", "Not found");
+  request->send(404, "text/plain", "Not found");
 }
 
 // ------------------------------------------------------------
