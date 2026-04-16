@@ -1,4 +1,6 @@
 #pragma once
+#include <stddef.h>
+#include <stdint.h>
 
 #define SSC_PIN_IR            23
 #define SSC_PIN_WS2812B       18
@@ -72,3 +74,53 @@
 #ifndef SSC_MOTOR_LAG_WARN_MIN_INTERVAL_MS
 #define SSC_MOTOR_LAG_WARN_MIN_INTERVAL_MS 1000
 #endif
+
+// Web remote UI customization
+// - Change labels in SSC_WEB_REMOTE_BUTTON_LABELS to rename displayed button text.
+// - Change colors in SSC_WEB_REMOTE_BUTTON_COLORS to set each button color in RGB.
+// - Keep count/order aligned across KEYS/LABELS/COLORS.
+struct SscRgbColor
+{
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+};
+
+constexpr size_t SSC_WEB_REMOTE_BUTTON_COUNT = 21;
+
+constexpr const char* SSC_WEB_REMOTE_BUTTON_KEYS[SSC_WEB_REMOTE_BUTTON_COUNT] = {
+  "BTN_POWER", "BTN_MODE", "BTN_MUTE",
+  "BTN_PLAYPAUSE", "BTN_PREV", "BTN_NEXT",
+  "BTN_EQ", "BTN_VOL_DOWN", "BTN_VOL_UP",
+  "BTN_0", "BTN_RPT", "BTN_CLOCK",
+  "BTN_1", "BTN_2", "BTN_3",
+  "BTN_4", "BTN_5", "BTN_6",
+  "BTN_7", "BTN_8", "BTN_9",
+};
+
+constexpr const char* SSC_WEB_REMOTE_BUTTON_LABELS[SSC_WEB_REMOTE_BUTTON_COUNT] = {
+  "BTN_POWER", "BTN_MODE", "BTN_MUTE",
+  "BTN_PLAYPAUSE", "BTN_PREV", "BTN_NEXT",
+  "BTN_EQ", "BTN_VOL_DOWN", "BTN_VOL_UP",
+  "BTN_0", "BTN_RPT", "BTN_CLOCK",
+  "BTN_1", "BTN_2", "BTN_3",
+  "BTN_4", "BTN_5", "BTN_6",
+  "BTN_7", "BTN_8", "BTN_9",
+};
+
+constexpr SscRgbColor SSC_WEB_REMOTE_BUTTON_COLORS[SSC_WEB_REMOTE_BUTTON_COUNT] = {
+  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
+  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
+  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
+  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
+  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
+  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
+  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
+};
+
+static_assert(sizeof(SSC_WEB_REMOTE_BUTTON_KEYS) / sizeof(SSC_WEB_REMOTE_BUTTON_KEYS[0]) == SSC_WEB_REMOTE_BUTTON_COUNT,
+              "SSC_WEB_REMOTE_BUTTON_KEYS count mismatch");
+static_assert(sizeof(SSC_WEB_REMOTE_BUTTON_LABELS) / sizeof(SSC_WEB_REMOTE_BUTTON_LABELS[0]) == SSC_WEB_REMOTE_BUTTON_COUNT,
+              "SSC_WEB_REMOTE_BUTTON_LABELS count mismatch");
+static_assert(sizeof(SSC_WEB_REMOTE_BUTTON_COLORS) / sizeof(SSC_WEB_REMOTE_BUTTON_COLORS[0]) == SSC_WEB_REMOTE_BUTTON_COUNT,
+              "SSC_WEB_REMOTE_BUTTON_COLORS count mismatch");

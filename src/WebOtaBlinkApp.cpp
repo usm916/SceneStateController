@@ -3,6 +3,7 @@
 #include <Update.h>
 #include <esp_wifi.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "button_position_store.h"
 #include "elevator_module.h"
@@ -669,6 +670,18 @@ bool WebOtaBlinkApp::parseRemoteButtonParam(const String& key, uint8_t* out_butt
 
 String WebOtaBlinkApp::makeHtml() const
 {
+  auto isToggleKey = [](const char* key) -> bool
+  {
+    if (key == nullptr) return false;
+    return strcmp(key, "BTN_PREV") == 0 || strcmp(key, "BTN_NEXT") == 0;
+  };
+
+  auto textColorForBg = [](const SscRgbColor& color) -> const char*
+  {
+    const uint16_t brightness = (uint16_t)color.r * 299 + (uint16_t)color.g * 587 + (uint16_t)color.b * 114;
+    return (brightness >= 128000) ? "#111111" : "#ffffff";
+  };
+
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
@@ -693,31 +706,50 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div class='box'><h2>Remote Buttons</h2>";
   html += "<div id='remote-status' class='small'>Ready</div>";
   html += "<div class='remote-grid'>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_POWER')\">BTN_POWER</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_MODE')\">BTN_MODE</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_MUTE')\">BTN_MUTE</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_PLAYPAUSE')\">BTN_PLAYPAUSE</button>";
-  html += "<button type='button' id='toggle-prev' class='";
-  html += webPrevToggleOn_ ? "toggle-on" : "";
-  html += "' onclick=\"toggleBtn('BTN_PREV', this)\">BTN_PREV</button>";
-  html += "<button type='button' id='toggle-next' class='";
-  html += webNextToggleOn_ ? "toggle-on" : "";
-  html += "' onclick=\"toggleBtn('BTN_NEXT', this)\">BTN_NEXT</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_EQ')\">BTN_EQ</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_VOL_DOWN')\">BTN_VOL_DOWN</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_VOL_UP')\">BTN_VOL_UP</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_0')\">BTN_0</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_RPT')\">BTN_RPT</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_CLOCK')\">BTN_CLOCK</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_1')\">BTN_1</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_2')\">BTN_2</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_3')\">BTN_3</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_4')\">BTN_4</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_5')\">BTN_5</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_6')\">BTN_6</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_7')\">BTN_7</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_8')\">BTN_8</button>";
-  html += "<button type='button' onclick=\"sendBtn('BTN_9')\">BTN_9</button>";
+
+  for (size_t i = 0; i < SSC_WEB_REMOTE_BUTTON_COUNT; ++i)
+  {
+    const char* key = SSC_WEB_REMOTE_BUTTON_KEYS[i];
+    const char* label = SSC_WEB_REMOTE_BUTTON_LABELS[i];
+    const SscRgbColor color = SSC_WEB_REMOTE_BUTTON_COLORS[i];
+    const bool toggleButton = isToggleKey(key);
+
+    html += "<button type='button'";
+    if (toggleButton)
+    {
+      if (strcmp(key, "BTN_PREV") == 0)
+      {
+        html += " id='toggle-prev' class='";
+        html += webPrevToggleOn_ ? "toggle-on" : "";
+        html += "'";
+      }
+      else if (strcmp(key, "BTN_NEXT") == 0)
+      {
+        html += " id='toggle-next' class='";
+        html += webNextToggleOn_ ? "toggle-on" : "";
+        html += "'";
+      }
+    }
+
+    html += " style='background:rgb(";
+    html += String(color.r);
+    html += ",";
+    html += String(color.g);
+    html += ",";
+    html += String(color.b);
+    html += ");color:";
+    html += textColorForBg(color);
+    html += ";'";
+
+    html += " onclick=\"";
+    html += toggleButton ? "toggleBtn('" : "sendBtn('";
+    html += key;
+    html += toggleButton ? "', this)\"" : "')\"";
+    html += ">";
+    html += htmlEscape(label ? label : key);
+    html += "</button>";
+  }
+
   html += "</div>";
   html += "<p class='small'>PREV/NEXTはトグル動作です。ON中は継続送信してエレベーターを上下動させます。</p>";
   html += "</div>";
