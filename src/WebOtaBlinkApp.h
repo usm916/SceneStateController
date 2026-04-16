@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <Preferences.h>
 
 class WebOtaBlinkApp
@@ -23,7 +23,7 @@ private:
   };
 
   Preferences prefs_;
-  WebServer server_{80};
+  AsyncWebServer server_{80};
 
   WifiSlot wifiSlots_[kMaxWifiSlots]{};
   bool apMode_ = false;
@@ -32,6 +32,8 @@ private:
   const char* fallbackApPass_ = "12345678";
 
   uint8_t customStaMac_[6] = {0x02, 0x10, 0x00, 0x00, 0x00, 0x01};
+  bool restartScheduled_ = false;
+  unsigned long restartAtMs_ = 0;
 
   void loadSettings();
   void saveSettings();
@@ -44,10 +46,10 @@ private:
 
   void registerRoutes();
 
-  void handleRoot();
-  void handleSaveWifi();
-  void handleReboot();
-  void handleNotFound();
+  void handleRoot(AsyncWebServerRequest* request);
+  void handleSaveWifi(AsyncWebServerRequest* request);
+  void handleReboot(AsyncWebServerRequest* request);
+  void handleNotFound(AsyncWebServerRequest* request);
 
   String makeHtml() const;
   String htmlEscape(const String& s) const;
