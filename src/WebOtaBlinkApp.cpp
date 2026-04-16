@@ -3,6 +3,7 @@
 #include <Update.h>
 #include <esp_wifi.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "button_position_store.h"
 #include "elevator_module.h"
@@ -44,6 +45,21 @@ void WebOtaBlinkApp::begin()
 
 void WebOtaBlinkApp::loop()
 {
+  const unsigned long nowMs = millis();
+  if ((webPrevToggleOn_ || webNextToggleOn_) && static_cast<long>(nowMs - nextWebToggleInjectAtMs_) >= 0)
+  {
+    if (webPrevToggleOn_ && !webNextToggleOn_)
+    {
+      ir_inject_button(BTN_PREV, 260);
+    }
+    else if (webNextToggleOn_ && !webPrevToggleOn_)
+    {
+      ir_inject_button(BTN_NEXT, 260);
+    }
+
+    nextWebToggleInjectAtMs_ = nowMs + 120;
+  }
+
   if (restartScheduled_ && static_cast<long>(millis() - restartAtMs_) >= 0)
   {
     ESP.restart();
@@ -265,6 +281,7 @@ void WebOtaBlinkApp::registerRoutes()
   server_.on("/save-wifi", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveWifi(request); });
   server_.on("/save-control", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveControl(request); });
   server_.on("/press-btn", HTTP_POST, [this](AsyncWebServerRequest* request) { handlePressButton(request); });
+  server_.on("/set-toggle", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSetToggle(request); });
   server_.on("/reboot", HTTP_GET, [this](AsyncWebServerRequest* request) { handleReboot(request); });
   server_.on("/update", HTTP_GET, [this](AsyncWebServerRequest* request) { handleOtaPage(request); });
   server_.on("/update", HTTP_POST,
@@ -420,7 +437,53 @@ void WebOtaBlinkApp::handlePressButton(AsyncWebServerRequest* request)
   }
 
   ir_inject_button((RemoteButton)buttonCode, 300);
-  request->redirect("/");
+  request->send(200, "text/plain; charset=utf-8", String("Sent: ") + btnParam->value());
+}
+
+void WebOtaBlinkApp::handleSetToggle(AsyncWebServerRequest* request)
+{
+  if (request == nullptr || !request->hasParam("btn", true) || !request->hasParam("on", true))
+  {
+    request->send(400, "text/plain", "Missing btn/on");
+    return;
+  }
+
+  const AsyncWebParameter* btnParam = request->getParam("btn", true);
+  const AsyncWebParameter* onParam = request->getParam("on", true);
+  if (btnParam == nullptr || onParam == nullptr)
+  {
+    request->send(400, "text/plain", "Invalid btn/on");
+    return;
+  }
+
+  const bool enable = onParam->value() == "1";
+  const String btnName = btnParam->value();
+
+  if (btnName == "BTN_PREV")
+  {
+    webPrevToggleOn_ = enable;
+    if (enable) webNextToggleOn_ = false;
+  }
+  else if (btnName == "BTN_NEXT")
+  {
+    webNextToggleOn_ = enable;
+    if (enable) webPrevToggleOn_ = false;
+  }
+  else
+  {
+    request->send(400, "text/plain", "Toggle target must be BTN_PREV/BTN_NEXT");
+    return;
+  }
+
+  if (webPrevToggleOn_ || webNextToggleOn_)
+  {
+    nextWebToggleInjectAtMs_ = millis();
+  }
+
+  String message = "Toggle ";
+  message += btnName;
+  message += enable ? " ON" : " OFF";
+  request->send(200, "text/plain; charset=utf-8", message);
 }
 
 void WebOtaBlinkApp::handleOtaPage(AsyncWebServerRequest* request)
@@ -607,6 +670,18 @@ bool WebOtaBlinkApp::parseRemoteButtonParam(const String& key, uint8_t* out_butt
 
 String WebOtaBlinkApp::makeHtml() const
 {
+  auto isToggleKey = [](const char* key) -> bool
+  {
+    if (key == nullptr) return false;
+    return strcmp(key, "BTN_PREV") == 0 || strcmp(key, "BTN_NEXT") == 0;
+  };
+
+  auto textColorForBg = [](const SscRgbColor& color) -> const char*
+  {
+    const uint16_t brightness = (uint16_t)color.r * 299 + (uint16_t)color.g * 587 + (uint16_t)color.b * 114;
+    return (brightness >= 128000) ? "#111111" : "#ffffff";
+  };
+
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
@@ -621,10 +696,63 @@ String WebOtaBlinkApp::makeHtml() const
   html += ".remote-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}";
   html += ".remote-grid button{width:100%;margin-top:0;}";
   html += ".remote-grid .empty{visibility:hidden;}";
+  html += ".toggle-on{background:#0d6efd;color:#fff;border-color:#0b5ed7;}";
+  html += "#remote-status{min-height:1.4em;font-weight:bold;}";
   html += ".small{font-size:0.9em;color:#555;}";
   html += "</style></head><body>";
 
   html += "<h1>ESP32 Web Setup</h1>";
+
+  html += "<div class='box'><h2>Remote Buttons</h2>";
+  html += "<div id='remote-status' class='small'>Ready</div>";
+  html += "<div class='remote-grid'>";
+
+  for (size_t i = 0; i < SSC_WEB_REMOTE_BUTTON_COUNT; ++i)
+  {
+    const char* key = SSC_WEB_REMOTE_BUTTON_KEYS[i];
+    const char* label = SSC_WEB_REMOTE_BUTTON_LABELS[i];
+    const SscRgbColor color = SSC_WEB_REMOTE_BUTTON_COLORS[i];
+    const bool toggleButton = isToggleKey(key);
+
+    html += "<button type='button'";
+    if (toggleButton)
+    {
+      if (strcmp(key, "BTN_PREV") == 0)
+      {
+        html += " id='toggle-prev' class='";
+        html += webPrevToggleOn_ ? "toggle-on" : "";
+        html += "'";
+      }
+      else if (strcmp(key, "BTN_NEXT") == 0)
+      {
+        html += " id='toggle-next' class='";
+        html += webNextToggleOn_ ? "toggle-on" : "";
+        html += "'";
+      }
+    }
+
+    html += " style='background:rgb(";
+    html += String(color.r);
+    html += ",";
+    html += String(color.g);
+    html += ",";
+    html += String(color.b);
+    html += ");color:";
+    html += textColorForBg(color);
+    html += ";'";
+
+    html += " onclick=\"";
+    html += toggleButton ? "toggleBtn('" : "sendBtn('";
+    html += key;
+    html += toggleButton ? "', this)\"" : "')\"";
+    html += ">";
+    html += htmlEscape(label ? label : key);
+    html += "</button>";
+  }
+
+  html += "</div>";
+  html += "<p class='small'>PREV/NEXTはトグル動作です。ON中は継続送信してエレベーターを上下動させます。</p>";
+  html += "</div>";
 
   html += "<div class='box'><h2>Status</h2>";
   html += "<div class='grid'>";
@@ -716,34 +844,6 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<button type='submit'>Save Controller Settings</button>";
   html += "</form></div>";
 
-  html += "<div class='box'><h2>Remote Buttons</h2>";
-  html += "<form method='POST' action='/press-btn'>";
-  html += "<div class='remote-grid'>";
-  html += "<button type='submit' name='btn' value='BTN_POWER'>BTN_POWER</button>";
-  html += "<button type='submit' name='btn' value='BTN_MODE'>BTN_MODE</button>";
-  html += "<button type='submit' name='btn' value='BTN_MUTE'>BTN_MUTE</button>";
-  html += "<button type='submit' name='btn' value='BTN_PLAYPAUSE'>BTN_PLAYPAUSE</button>";
-  html += "<button type='submit' name='btn' value='BTN_PREV'>BTN_PREV</button>";
-  html += "<button type='submit' name='btn' value='BTN_NEXT'>BTN_NEXT</button>";
-  html += "<button type='submit' name='btn' value='BTN_EQ'>BTN_EQ</button>";
-  html += "<button type='submit' name='btn' value='BTN_VOL_DOWN'>BTN_VOL_DOWN</button>";
-  html += "<button type='submit' name='btn' value='BTN_VOL_UP'>BTN_VOL_UP</button>";
-  html += "<button type='submit' name='btn' value='BTN_0'>BTN_0</button>";
-  html += "<button type='submit' name='btn' value='BTN_RPT'>BTN_RPT</button>";
-  html += "<button type='submit' name='btn' value='BTN_CLOCK'>BTN_CLOCK</button>";
-  html += "<button type='submit' name='btn' value='BTN_1'>BTN_1</button>";
-  html += "<button type='submit' name='btn' value='BTN_2'>BTN_2</button>";
-  html += "<button type='submit' name='btn' value='BTN_3'>BTN_3</button>";
-  html += "<button type='submit' name='btn' value='BTN_4'>BTN_4</button>";
-  html += "<button type='submit' name='btn' value='BTN_5'>BTN_5</button>";
-  html += "<button type='submit' name='btn' value='BTN_6'>BTN_6</button>";
-  html += "<button type='submit' name='btn' value='BTN_7'>BTN_7</button>";
-  html += "<button type='submit' name='btn' value='BTN_8'>BTN_8</button>";
-  html += "<button type='submit' name='btn' value='BTN_9'>BTN_9</button>";
-  html += "</div>";
-  html += "<p class='small'>IRリモコンの並びに合わせて、BTN enumで定義された全ボタンをWebから送信できます。</p>";
-  html += "</form></div>";
-
   html += "<div class='box'><h2>Actions</h2>";
   html += "<a class='btn' href='/reboot'>Reboot</a>";
   html += "</div>";
@@ -756,6 +856,24 @@ String WebOtaBlinkApp::makeHtml() const
     html += "</b> and open <span class='mono'>http://192.168.4.1/</span></p>";
     html += "</div>";
   }
+
+  html += "<script>";
+  html += "function setStatus(msg,isErr){const s=document.getElementById('remote-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
+  html += "function postForm(url,data){return fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams(data)});}";
+  html += "function syncToggleUi(active){const p=document.getElementById('toggle-prev');const n=document.getElementById('toggle-next');if(p)p.classList.toggle('toggle-on',active==='BTN_PREV');if(n)n.classList.toggle('toggle-on',active==='BTN_NEXT');}";
+  html += "async function sendBtn(btn){try{const r=await postForm('/press-btn',{btn:btn});const t=await r.text();setStatus((r.ok?t:('Send failed: '+t)),!r.ok);}catch(e){setStatus('Send failed: '+e,true);}}";
+  html += "async function toggleBtn(btn,el){const on=!el.classList.contains('toggle-on');try{const r=await postForm('/set-toggle',{btn:btn,on:on?'1':'0'});const t=await r.text();if(r.ok){syncToggleUi(on?btn:'');setStatus(t,false);}else{setStatus('Toggle failed: '+t,true);}}catch(e){setStatus('Toggle failed: '+e,true);}}";
+  html += "syncToggleUi('";
+  if (webPrevToggleOn_)
+  {
+    html += "BTN_PREV";
+  }
+  else if (webNextToggleOn_)
+  {
+    html += "BTN_NEXT";
+  }
+  html += "');";
+  html += "</script>";
 
   html += "</body></html>";
   return html;
