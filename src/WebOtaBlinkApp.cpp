@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "button_position_store.h"
+#include "config.h"
 #include "elevator_module.h"
 #include "ir_module.h"
 #include "tmc2209_module.h"
