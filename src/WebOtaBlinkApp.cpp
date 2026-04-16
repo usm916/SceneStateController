@@ -270,20 +270,23 @@ void WebOtaBlinkApp::registerRoutes()
   server_.onNotFound([this]() { handleNotFound(); });
 }
 
-void WebOtaBlinkApp::handleRoot()
+void WebOtaBlinkApp::handleRoot(AsyncWebServerRequest* request)
 {
-  server_.send(200, "text/html; charset=utf-8", makeHtml());
+  request->send(200, "text/html; charset=utf-8", makeHtml());
 }
 
-void WebOtaBlinkApp::handleSaveWifi()
+void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
 {
   for (int i = 0; i < kMaxWifiSlots; ++i)
   {
     const String ssidKey = "ssid" + String(i);
     const String passKey = "pass" + String(i);
 
-    const String ssid = server_.hasArg(ssidKey) ? server_.arg(ssidKey) : "";
-    const String pass = server_.hasArg(passKey) ? server_.arg(passKey) : "";
+    const AsyncWebParameter* ssidParam = request->getParam(ssidKey, true);
+    const AsyncWebParameter* passParam = request->getParam(passKey, true);
+
+    const String ssid = (ssidParam != nullptr) ? ssidParam->value() : "";
+    const String pass = (passParam != nullptr) ? passParam->value() : "";
 
     memset(wifiSlots_[i].ssid, 0, sizeof(wifiSlots_[i].ssid));
     memset(wifiSlots_[i].pass, 0, sizeof(wifiSlots_[i].pass));
@@ -307,7 +310,7 @@ void WebOtaBlinkApp::handleSaveWifi()
   restartAtMs_ = millis() + 800;
 }
 
-void WebOtaBlinkApp::handleReboot()
+void WebOtaBlinkApp::handleReboot(AsyncWebServerRequest* request)
 {
   server_.send(200, "text/html; charset=utf-8",
                "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
@@ -379,9 +382,9 @@ void WebOtaBlinkApp::handleOtaDone()
   server_.send(200, "text/html; charset=utf-8", html);
 }
 
-void WebOtaBlinkApp::handleNotFound()
+void WebOtaBlinkApp::handleNotFound(AsyncWebServerRequest* request)
 {
-  server_.send(404, "text/plain", "Not found");
+  request->send(404, "text/plain", "Not found");
 }
 
 // ------------------------------------------------------------

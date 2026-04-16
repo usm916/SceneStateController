@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <Preferences.h>
 
 class WebOtaBlinkApp
@@ -24,7 +24,7 @@ private:
   };
 
   Preferences prefs_;
-  WebServer server_{80};
+  AsyncWebServer server_{80};
 
   WifiSlot wifiSlots_[kMaxWifiSlots]{};
   bool apMode_ = false;
