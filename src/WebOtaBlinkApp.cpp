@@ -42,12 +42,6 @@ void WebOtaBlinkApp::loop()
   {
     ESP.restart();
   }
-
-  if (static_cast<long>(millis() - nextWebPollAtMs_) >= 0)
-  {
-    server_.handleClient();
-    nextWebPollAtMs_ = millis() + kWebPollIntervalMs;
-  }
 }
 
 // ------------------------------------------------------------
@@ -261,13 +255,18 @@ void WebOtaBlinkApp::startFallbackAp()
 // ------------------------------------------------------------
 void WebOtaBlinkApp::registerRoutes()
 {
-  server_.on("/", HTTP_GET, [this]() { handleRoot(); });
-  server_.on("/save-wifi", HTTP_POST, [this]() { handleSaveWifi(); });
-  server_.on("/reboot", HTTP_GET, [this]() { handleReboot(); });
-  server_.on("/update", HTTP_GET, [this]() { handleOtaPage(); });
-  server_.on("/update", HTTP_POST, [this]() { handleOtaDone(); },
-             [this]() { handleOtaUpload(); });
-  server_.onNotFound([this]() { handleNotFound(); });
+  server_.on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
+  server_.on("/save-wifi", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveWifi(request); });
+  server_.on("/reboot", HTTP_GET, [this](AsyncWebServerRequest* request) { handleReboot(request); });
+  server_.on("/update", HTTP_GET, [this](AsyncWebServerRequest* request) { handleOtaPage(request); });
+  server_.on("/update", HTTP_POST,
+             [this](AsyncWebServerRequest* request) { handleOtaDone(request); },
+             [this](AsyncWebServerRequest* request, const String& filename,
+                    size_t index, uint8_t* data, size_t len, bool final)
+             {
+               handleOtaUpload(request, filename, index, data, len, final);
+             });
+  server_.onNotFound([this](AsyncWebServerRequest* request) { handleNotFound(request); });
 }
 
 void WebOtaBlinkApp::handleRoot(AsyncWebServerRequest* request)
@@ -305,20 +304,20 @@ void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
   html += "<p>Device will reboot and retry the Wi-Fi list.</p>";
   html += "</body></html>";
 
-  server_.send(200, "text/html; charset=utf-8", html);
+  request->send(200, "text/html; charset=utf-8", html);
   restartScheduled_ = true;
   restartAtMs_ = millis() + 800;
 }
 
 void WebOtaBlinkApp::handleReboot(AsyncWebServerRequest* request)
 {
-  server_.send(200, "text/html; charset=utf-8",
-               "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
+  request->send(200, "text/html; charset=utf-8",
+                "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
   restartScheduled_ = true;
   restartAtMs_ = millis() + 500;
 }
 
-void WebOtaBlinkApp::handleOtaPage()
+void WebOtaBlinkApp::handleOtaPage(AsyncWebServerRequest* request)
 {
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
@@ -330,37 +329,35 @@ void WebOtaBlinkApp::handleOtaPage()
   html += "<button type='submit'>Upload</button>";
   html += "</form>";
   html += "</body></html>";
-  server_.send(200, "text/html; charset=utf-8", html);
+  request->send(200, "text/html; charset=utf-8", html);
 }
 
-void WebOtaBlinkApp::handleOtaUpload()
+void WebOtaBlinkApp::handleOtaUpload(AsyncWebServerRequest* request, const String& filename,
+                                     size_t index, uint8_t* data, size_t len, bool final)
 {
-  HTTPUpload& upload = server_.upload();
+  (void)request;
+  (void)filename;
 
-  if (upload.status == UPLOAD_FILE_START)
+  if (index == 0)
   {
     otaUploadOk_ = Update.begin(UPDATE_SIZE_UNKNOWN);
   }
-  else if (upload.status == UPLOAD_FILE_WRITE)
+
+  if (otaUploadOk_ && len > 0)
   {
-    if (otaUploadOk_)
+    if (Update.write(data, len) != len)
     {
-      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
-      {
-        otaUploadOk_ = false;
-      }
+      otaUploadOk_ = false;
     }
   }
-  else if (upload.status == UPLOAD_FILE_END)
+
+  if (final && otaUploadOk_)
   {
-    if (otaUploadOk_)
-    {
-      otaUploadOk_ = Update.end(true);
-    }
+    otaUploadOk_ = Update.end(true);
   }
 }
 
-void WebOtaBlinkApp::handleOtaDone()
+void WebOtaBlinkApp::handleOtaDone(AsyncWebServerRequest* request)
 {
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
@@ -379,7 +376,7 @@ void WebOtaBlinkApp::handleOtaDone()
   }
 
   html += "</body></html>";
-  server_.send(200, "text/html; charset=utf-8", html);
+  request->send(200, "text/html; charset=utf-8", html);
 }
 
 void WebOtaBlinkApp::handleNotFound(AsyncWebServerRequest* request)
