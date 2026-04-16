@@ -6,6 +6,7 @@
 
 #include "button_position_store.h"
 #include "elevator_module.h"
+#include "ir_module.h"
 #include "tmc2209_module.h"
 
 // ------------------------------------------------------------
@@ -263,6 +264,7 @@ void WebOtaBlinkApp::registerRoutes()
   server_.on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
   server_.on("/save-wifi", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveWifi(request); });
   server_.on("/save-control", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveControl(request); });
+  server_.on("/press-btn", HTTP_POST, [this](AsyncWebServerRequest* request) { handlePressButton(request); });
   server_.on("/reboot", HTTP_GET, [this](AsyncWebServerRequest* request) { handleReboot(request); });
   server_.on("/update", HTTP_GET, [this](AsyncWebServerRequest* request) { handleOtaPage(request); });
   server_.on("/update", HTTP_POST,
@@ -392,6 +394,32 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     (void)button_position_store_save();
   }
 
+  request->redirect("/");
+}
+
+void WebOtaBlinkApp::handlePressButton(AsyncWebServerRequest* request)
+{
+  if (request == nullptr || !request->hasParam("btn", true))
+  {
+    request->send(400, "text/plain", "Missing btn");
+    return;
+  }
+
+  const AsyncWebParameter* btnParam = request->getParam("btn", true);
+  if (btnParam == nullptr)
+  {
+    request->send(400, "text/plain", "Invalid btn");
+    return;
+  }
+
+  uint8_t buttonCode = 0;
+  if (!parseRemoteButtonParam(btnParam->value(), &buttonCode))
+  {
+    request->send(400, "text/plain", "Unknown btn");
+    return;
+  }
+
+  ir_inject_button((RemoteButton)buttonCode, 300);
   request->redirect("/");
 }
 
@@ -531,6 +559,52 @@ bool WebOtaBlinkApp::parseIntParam(AsyncWebServerRequest* request, const String&
   return true;
 }
 
+bool WebOtaBlinkApp::parseRemoteButtonParam(const String& key, uint8_t* out_button_code) const
+{
+  if (out_button_code == nullptr) return false;
+
+  struct BtnMap
+  {
+    const char* name;
+    RemoteButton btn;
+  };
+
+  static const BtnMap kBtnMap[] = {
+    {"BTN_POWER", BTN_POWER},
+    {"BTN_MODE", BTN_MODE},
+    {"BTN_MUTE", BTN_MUTE},
+    {"BTN_PLAYPAUSE", BTN_PLAYPAUSE},
+    {"BTN_PREV", BTN_PREV},
+    {"BTN_NEXT", BTN_NEXT},
+    {"BTN_EQ", BTN_EQ},
+    {"BTN_VOL_DOWN", BTN_VOL_DOWN},
+    {"BTN_VOL_UP", BTN_VOL_UP},
+    {"BTN_0", BTN_0},
+    {"BTN_RPT", BTN_RPT},
+    {"BTN_CLOCK", BTN_CLOCK},
+    {"BTN_1", BTN_1},
+    {"BTN_2", BTN_2},
+    {"BTN_3", BTN_3},
+    {"BTN_4", BTN_4},
+    {"BTN_5", BTN_5},
+    {"BTN_6", BTN_6},
+    {"BTN_7", BTN_7},
+    {"BTN_8", BTN_8},
+    {"BTN_9", BTN_9},
+  };
+
+  for (const auto& entry : kBtnMap)
+  {
+    if (key == entry.name)
+    {
+      *out_button_code = (uint8_t)entry.btn;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 String WebOtaBlinkApp::makeHtml() const
 {
   String html;
@@ -544,6 +618,9 @@ String WebOtaBlinkApp::makeHtml() const
   html += "button,a.btn{display:inline-block;padding:10px 14px;margin-top:12px;text-decoration:none;border:1px solid #333;border-radius:8px;background:#f5f5f5;color:#000;}";
   html += ".mono{font-family:monospace;}";
   html += ".grid{display:grid;grid-template-columns:160px 1fr;gap:8px 12px;align-items:center;}";
+  html += ".remote-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}";
+  html += ".remote-grid button{width:100%;margin-top:0;}";
+  html += ".remote-grid .empty{visibility:hidden;}";
   html += ".small{font-size:0.9em;color:#555;}";
   html += "</style></head><body>";
 
@@ -637,6 +714,34 @@ String WebOtaBlinkApp::makeHtml() const
 
   html += "<p class='small'>INFOやserial/IRで更新可能な値をここから書き換えできます。保存時にNVSへ永続化します。</p>";
   html += "<button type='submit'>Save Controller Settings</button>";
+  html += "</form></div>";
+
+  html += "<div class='box'><h2>Remote Buttons</h2>";
+  html += "<form method='POST' action='/press-btn'>";
+  html += "<div class='remote-grid'>";
+  html += "<button type='submit' name='btn' value='BTN_POWER'>BTN_POWER</button>";
+  html += "<button type='submit' name='btn' value='BTN_MODE'>BTN_MODE</button>";
+  html += "<button type='submit' name='btn' value='BTN_MUTE'>BTN_MUTE</button>";
+  html += "<button type='submit' name='btn' value='BTN_PLAYPAUSE'>BTN_PLAYPAUSE</button>";
+  html += "<button type='submit' name='btn' value='BTN_PREV'>BTN_PREV</button>";
+  html += "<button type='submit' name='btn' value='BTN_NEXT'>BTN_NEXT</button>";
+  html += "<button type='submit' name='btn' value='BTN_EQ'>BTN_EQ</button>";
+  html += "<button type='submit' name='btn' value='BTN_VOL_DOWN'>BTN_VOL_DOWN</button>";
+  html += "<button type='submit' name='btn' value='BTN_VOL_UP'>BTN_VOL_UP</button>";
+  html += "<button type='submit' name='btn' value='BTN_0'>BTN_0</button>";
+  html += "<button type='submit' name='btn' value='BTN_RPT'>BTN_RPT</button>";
+  html += "<button type='submit' name='btn' value='BTN_CLOCK'>BTN_CLOCK</button>";
+  html += "<button type='submit' name='btn' value='BTN_1'>BTN_1</button>";
+  html += "<button type='submit' name='btn' value='BTN_2'>BTN_2</button>";
+  html += "<button type='submit' name='btn' value='BTN_3'>BTN_3</button>";
+  html += "<button type='submit' name='btn' value='BTN_4'>BTN_4</button>";
+  html += "<button type='submit' name='btn' value='BTN_5'>BTN_5</button>";
+  html += "<button type='submit' name='btn' value='BTN_6'>BTN_6</button>";
+  html += "<button type='submit' name='btn' value='BTN_7'>BTN_7</button>";
+  html += "<button type='submit' name='btn' value='BTN_8'>BTN_8</button>";
+  html += "<button type='submit' name='btn' value='BTN_9'>BTN_9</button>";
+  html += "</div>";
+  html += "<p class='small'>IRリモコンの並びに合わせて、BTN enumで定義された全ボタンをWebから送信できます。</p>";
   html += "</form></div>";
 
   html += "<div class='box'><h2>Actions</h2>";

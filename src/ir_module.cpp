@@ -159,3 +159,23 @@ RemoteButton ir_get_latest_button() {
   (void)ir_poll(ignored);
   return ir_active_btn();
 }
+
+void ir_inject_button(RemoteButton btn, uint16_t hold_ms) {
+  const uint32_t now_ms = millis();
+  update_button_lifecycle(now_ms);
+
+  if (btn == BTN_NONE) {
+    if (s_active_btn != BTN_NONE) {
+      s_released_btn = s_active_btn;
+    }
+    s_active_btn = BTN_NONE;
+    s_active_btn_until_ms = 0;
+    return;
+  }
+
+  if (s_active_btn != BTN_NONE && s_active_btn != btn) {
+    s_released_btn = s_active_btn;
+  }
+  s_active_btn = btn;
+  s_active_btn_until_ms = now_ms + ((hold_ms > 0) ? hold_ms : kIrHoldMs);
+}

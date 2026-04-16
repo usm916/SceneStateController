@@ -50,6 +50,7 @@ private:
   void handleRoot(AsyncWebServerRequest* request);
   void handleSaveWifi(AsyncWebServerRequest* request);
   void handleSaveControl(AsyncWebServerRequest* request);
+  void handlePressButton(AsyncWebServerRequest* request);
   void handleReboot(AsyncWebServerRequest* request);
   void handleOtaPage(AsyncWebServerRequest* request);
   void handleOtaUpload(AsyncWebServerRequest* request, const String& filename,
@@ -63,4 +64,5 @@ private:
   String currentIpText() const;
   String customMacText() const;
   bool parseIntParam(AsyncWebServerRequest* request, const String& key, int32_t* out_value) const;
+  bool parseRemoteButtonParam(const String& key, uint8_t* out_button_code) const;
 };
