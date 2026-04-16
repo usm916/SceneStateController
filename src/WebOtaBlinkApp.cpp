@@ -1,5 +1,6 @@
 #include "WebOtaBlinkApp.h"
 
+#include <Update.h>
 #include <esp_wifi.h>
 
 // ------------------------------------------------------------
@@ -30,7 +31,9 @@ void WebOtaBlinkApp::begin()
   Serial.println("[HTTP] Server started");
   Serial.print("[HTTP] Open: http://");
   Serial.println(currentIpText());
-  Serial.println("[HTTP] OTA : disabled (ElegantOTA removed)");
+  Serial.print("[HTTP] OTA : http://");
+  Serial.print(currentIpText());
+  Serial.println("/update");
 }
 
 void WebOtaBlinkApp::loop()
@@ -261,6 +264,9 @@ void WebOtaBlinkApp::registerRoutes()
   server_.on("/", HTTP_GET, [this]() { handleRoot(); });
   server_.on("/save-wifi", HTTP_POST, [this]() { handleSaveWifi(); });
   server_.on("/reboot", HTTP_GET, [this]() { handleReboot(); });
+  server_.on("/update", HTTP_GET, [this]() { handleOtaPage(); });
+  server_.on("/update", HTTP_POST, [this]() { handleOtaDone(); },
+             [this]() { handleOtaUpload(); });
   server_.onNotFound([this]() { handleNotFound(); });
 }
 
@@ -307,6 +313,70 @@ void WebOtaBlinkApp::handleReboot()
                "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
   restartScheduled_ = true;
   restartAtMs_ = millis() + 500;
+}
+
+void WebOtaBlinkApp::handleOtaPage()
+{
+  String html;
+  html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<title>Web OTA</title></head><body style='font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;'>";
+  html += "<h1>Firmware Update</h1>";
+  html += "<form method='POST' action='/update' enctype='multipart/form-data'>";
+  html += "<input type='file' name='firmware' accept='.bin' required>";
+  html += "<button type='submit'>Upload</button>";
+  html += "</form>";
+  html += "</body></html>";
+  server_.send(200, "text/html; charset=utf-8", html);
+}
+
+void WebOtaBlinkApp::handleOtaUpload()
+{
+  HTTPUpload& upload = server_.upload();
+
+  if (upload.status == UPLOAD_FILE_START)
+  {
+    otaUploadOk_ = Update.begin(UPDATE_SIZE_UNKNOWN);
+  }
+  else if (upload.status == UPLOAD_FILE_WRITE)
+  {
+    if (otaUploadOk_)
+    {
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
+      {
+        otaUploadOk_ = false;
+      }
+    }
+  }
+  else if (upload.status == UPLOAD_FILE_END)
+  {
+    if (otaUploadOk_)
+    {
+      otaUploadOk_ = Update.end(true);
+    }
+  }
+}
+
+void WebOtaBlinkApp::handleOtaDone()
+{
+  String html;
+  html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<title>OTA Result</title></head><body style='font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;'>";
+
+  if (otaUploadOk_)
+  {
+    html += "<h1>Update successful</h1><p>Rebooting...</p>";
+    restartScheduled_ = true;
+    restartAtMs_ = millis() + 1200;
+  }
+  else
+  {
+    html += "<h1>Update failed</h1><p>Check firmware binary and try again.</p>";
+  }
+
+  html += "</body></html>";
+  server_.send(200, "text/html; charset=utf-8", html);
 }
 
 void WebOtaBlinkApp::handleNotFound()
@@ -428,7 +498,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "</form></div>";
 
   html += "<div class='box'><h2>OTA</h2>";
-  html += "<p>ElegantOTA is disabled to reduce runtime load.</p>";
+  html += "<a class='btn' href='/update'>Open Web OTA</a>";
   html += "</div>";
 
   html += "<div class='box'><h2>Actions</h2>";
