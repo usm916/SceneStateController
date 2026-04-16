@@ -734,7 +734,7 @@ String WebOtaBlinkApp::makeHtml() const
     const uint8_t r = redFromWebColor(webColor);
     const uint8_t g = greenFromWebColor(webColor);
     const uint8_t b = blueFromWebColor(webColor);
-    return (r < 128 || g < 128 || b < 128) ? "rgba(255,255,255,1.0)" : "rgba(255,255,255,0.2)";
+    return (r < 128 || g < 128 || b < 128) ? "rgb(255,255,255)" : "rgb(48,48,48)";
   };
 
   String html;
