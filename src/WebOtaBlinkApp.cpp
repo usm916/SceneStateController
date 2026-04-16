@@ -710,6 +710,12 @@ String WebOtaBlinkApp::makeHtml() const
   };
 
 
+  auto textColorForBg = [](const SscRgbColor& color) -> const char*
+  {
+    const uint16_t brightness = (uint16_t)color.r * 299 + (uint16_t)color.g * 587 + (uint16_t)color.b * 114;
+    return (brightness >= 128000) ? "#111111" : "#ffffff";
+  };
+
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
@@ -722,10 +728,9 @@ String WebOtaBlinkApp::makeHtml() const
   html += ".mono{font-family:monospace;}";
   html += ".grid{display:grid;grid-template-columns:160px 1fr;gap:8px 12px;align-items:center;}";
   html += ".remote-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}";
-  html += ".remote-grid button{width:100%;margin-top:0;padding:60px 14px;background:rgb(217,217,217);color:rgb(26,26,26);border-color:#999;font-size:1.3em;}";
+  html += ".remote-grid button{width:100%;margin-top:0;padding:20px 14px;}";
   html += ".remote-grid .empty{visibility:hidden;}";
-  html += ".remote-grid button.power-button{background:rgb(200,40,40);}";
-  html += ".toggle-on{background:rgb(77,77,77)!important;}";
+  html += ".toggle-on{filter:brightness(0.55);}";
   html += "#remote-status{min-height:1.4em;font-weight:bold;}";
   html += ".small{font-size:0.9em;color:#555;}";
   html += "</style></head><body>";
@@ -740,6 +745,7 @@ String WebOtaBlinkApp::makeHtml() const
   {
     const char* key = SSC_WEB_REMOTE_BUTTON_KEYS[i];
     const char* label = SSC_WEB_REMOTE_BUTTON_LABELS[i];
+    const SscRgbColor color = SSC_WEB_REMOTE_BUTTON_COLORS[i];
     const bool toggleButton = isToggleKey(key);
 
     html += "<button type='button'";
@@ -759,15 +765,15 @@ String WebOtaBlinkApp::makeHtml() const
       }
     }
 
-    if (strcmp(key, "BTN_POWER") == 0)
-    {
-      html += " class='power-button";
-      if (toggleButton)
-      {
-        html += " toggle-on";
-      }
-      html += "'";
-    }
+    html += " style='background:rgb(";
+    html += String(color.r);
+    html += ",";
+    html += String(color.g);
+    html += ",";
+    html += String(color.b);
+    html += ");color:";
+    html += textColorForBg(color);
+    html += ";'";
 
     html += " onclick=\"";
     html += toggleButton ? "toggleBtn('" : "sendBtn('";
