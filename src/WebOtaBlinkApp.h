@@ -62,6 +62,7 @@ private:
   void handleOtaDone(AsyncWebServerRequest* request);
   void handleNotFound(AsyncWebServerRequest* request);
 
+  String renderControllerSettingsSection() const;
   String makeHtml() const;
   String htmlEscape(const String& s) const;
   String currentModeText() const;

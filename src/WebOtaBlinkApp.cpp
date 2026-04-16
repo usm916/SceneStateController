@@ -1,5 +1,9 @@
 #include "WebOtaBlinkApp.h"
 
+static const char kControllerSettingsSectionTemplate[] = R"HTML(
+#include "web_controller_settings_section.html"
+)HTML";
+
 #include <Update.h>
 #include <esp_wifi.h>
 #include <stdlib.h>
@@ -668,6 +672,34 @@ bool WebOtaBlinkApp::parseRemoteButtonParam(const String& key, uint8_t* out_butt
   return false;
 }
 
+String WebOtaBlinkApp::renderControllerSettingsSection() const
+{
+  String section = kControllerSettingsSectionTemplate;
+  section.replace("{{TMC_RUN_CURRENT_MA}}", String(tmc2209_run_current_ma()));
+  section.replace("{{TMC_HOLD_CURRENT_PCT}}", String(tmc2209_hold_current_pct()));
+  section.replace("{{MOVE_MAX_SPEED_STEPS_PER_SEC}}", String((int32_t)elevator_move_max_speed()));
+  section.replace("{{MOVE_ACCEL_STEPS_PER_SEC2}}", String((int32_t)elevator_move_acceleration()));
+  section.replace("{{BTN_ZERO_STEPS}}", String(button_position_store_zero_steps()));
+
+  String relativeRows;
+  for (int i = 0; i <= 9; ++i)
+  {
+    int32_t relativeSteps = 0;
+    const bool hasValue = button_position_store_relative((uint8_t)i, &relativeSteps);
+    relativeRows += "<label>BTN_";
+    relativeRows += String(i);
+    relativeRows += " relative steps</label>";
+    relativeRows += "<input name='btn_";
+    relativeRows += String(i);
+    relativeRows += "_relative_steps' type='number' value='";
+    relativeRows += hasValue ? String(relativeSteps) : "";
+    relativeRows += "' placeholder='Not set'>";
+  }
+
+  section.replace("{{BTN_RELATIVE_ROWS}}", relativeRows);
+  return section;
+}
+
 String WebOtaBlinkApp::makeHtml() const
 {
   auto isToggleKey = [](const char* key) -> bool
@@ -803,46 +835,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<a class='btn' href='/update'>Open Web OTA</a>";
   html += "</div>";
 
-  html += "<div class='box'><h2>Controller Settings</h2>";
-  html += "<form method='POST' action='/save-control'>";
-  html += "<label>TMC run current (mA)</label>";
-  html += "<input name='tmc_run_current_ma' type='number' min='1' max='2000' value='";
-  html += String(tmc2209_run_current_ma());
-  html += "'>";
-  html += "<label>TMC hold current (%)</label>";
-  html += "<input name='tmc_hold_current_pct' type='number' min='0' max='100' value='";
-  html += String(tmc2209_hold_current_pct());
-  html += "'>";
-  html += "<label>Move max speed (steps/sec)</label>";
-  html += "<input name='move_max_speed_steps_per_sec' type='number' min='1' value='";
-  html += String((int32_t)elevator_move_max_speed());
-  html += "'>";
-  html += "<label>Move acceleration (steps/sec²)</label>";
-  html += "<input name='move_accel_steps_per_sec2' type='number' min='1' value='";
-  html += String((int32_t)elevator_move_acceleration());
-  html += "'>";
-  html += "<label>Button zero steps (mute equivalent)</label>";
-  html += "<input name='btn_zero_steps' type='number' value='";
-  html += String(button_position_store_zero_steps());
-  html += "'>";
-
-  for (int i = 0; i <= 9; ++i)
-  {
-    int32_t relativeSteps = 0;
-    const bool hasValue = button_position_store_relative((uint8_t)i, &relativeSteps);
-    html += "<label>BTN_";
-    html += String(i);
-    html += " relative steps</label>";
-    html += "<input name='btn_";
-    html += String(i);
-    html += "_relative_steps' type='number' value='";
-    html += hasValue ? String(relativeSteps) : "";
-    html += "' placeholder='Not set'>";
-  }
-
-  html += "<p class='small'>INFOやserial/IRで更新可能な値をここから書き換えできます。保存時にNVSへ永続化します。</p>";
-  html += "<button type='submit'>Save Controller Settings</button>";
-  html += "</form></div>";
+  html += renderControllerSettingsSection();
 
   html += "<div class='box'><h2>Actions</h2>";
   html += "<a class='btn' href='/reboot'>Reboot</a>";
