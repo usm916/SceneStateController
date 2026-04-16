@@ -99,13 +99,13 @@ constexpr const char* SSC_WEB_REMOTE_BUTTON_KEYS[SSC_WEB_REMOTE_BUTTON_COUNT] = 
 };
 
 constexpr const char* SSC_WEB_REMOTE_BUTTON_LABELS[SSC_WEB_REMOTE_BUTTON_COUNT] = {
-  "BTN_POWER", "BTN_MODE", "BTN_MUTE",
-  "BTN_PLAYPAUSE", "BTN_PREV", "BTN_NEXT",
-  "BTN_EQ", "BTN_VOL_DOWN", "BTN_VOL_UP",
-  "BTN_0", "BTN_RPT", "BTN_CLOCK",
-  "BTN_1", "BTN_2", "BTN_3",
-  "BTN_4", "BTN_5", "BTN_6",
-  "BTN_7", "BTN_8", "BTN_9",
+  "POWER", "MODE", "MUTE",
+  "PLAYPAUSE", "PREV", "NEXT",
+  "EQ", "VOL_DOWN", "VOL_UP",
+  "0", "RPT", "CLOCK",
+  "1", "2", "3",
+  "4", "5", "6",
+  "7", "8", "9",
 };
 
 constexpr SscRgbColor SSC_WEB_REMOTE_BUTTON_COLORS[SSC_WEB_REMOTE_BUTTON_COUNT] = {
