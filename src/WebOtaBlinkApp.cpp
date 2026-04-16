@@ -1,6 +1,5 @@
 #include "WebOtaBlinkApp.h"
 
-#include <ElegantOTA.h>
 #include <esp_wifi.h>
 
 // ------------------------------------------------------------
@@ -26,15 +25,12 @@ void WebOtaBlinkApp::begin()
   }
 
   registerRoutes();
-  ElegantOTA.begin(&server_);
   server_.begin();
 
   Serial.println("[HTTP] Server started");
   Serial.print("[HTTP] Open: http://");
   Serial.println(currentIpText());
-  Serial.print("[HTTP] OTA : http://");
-  Serial.print(currentIpText());
-  Serial.println("/update");
+  Serial.println("[HTTP] OTA : disabled (ElegantOTA removed)");
 }
 
 void WebOtaBlinkApp::loop()
@@ -47,7 +43,6 @@ void WebOtaBlinkApp::loop()
   if (static_cast<long>(millis() - nextWebPollAtMs_) >= 0)
   {
     server_.handleClient();
-    ElegantOTA.loop();
     nextWebPollAtMs_ = millis() + kWebPollIntervalMs;
   }
 }
@@ -433,7 +428,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "</form></div>";
 
   html += "<div class='box'><h2>OTA</h2>";
-  html += "<a class='btn' href='/update'>Open Web OTA</a>";
+  html += "<p>ElegantOTA is disabled to reduce runtime load.</p>";
   html += "</div>";
 
   html += "<div class='box'><h2>Actions</h2>";
