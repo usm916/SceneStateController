@@ -41,4 +41,5 @@ bool ir_btn_released(RemoteButton btn);
 bool ir_any_btn();
 RemoteButton ir_active_btn();
 RemoteButton ir_get_latest_button();
+void ir_inject_button(RemoteButton btn, uint16_t hold_ms = 200);
 inline bool btn(RemoteButton btn_code) { return ir_btn(btn_code); }
