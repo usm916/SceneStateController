@@ -1,9 +1,6 @@
 #include "WebOtaBlinkApp.h"
 
-#ifndef ELEGANTOTA_USE_ASYNC_WEBSERVER
-#define ELEGANTOTA_USE_ASYNC_WEBSERVER 1
-#endif
-#include <ElegantOTA.h>
+#include <Update.h>
 #include <esp_wifi.h>
 
 // ------------------------------------------------------------
@@ -29,7 +26,6 @@ void WebOtaBlinkApp::begin()
   }
 
   registerRoutes();
-  ElegantOTA.begin(&server_);
   server_.begin();
 
   Serial.println("[HTTP] Server started");
@@ -45,6 +41,12 @@ void WebOtaBlinkApp::loop()
   if (restartScheduled_ && static_cast<long>(millis() - restartAtMs_) >= 0)
   {
     ESP.restart();
+  }
+
+  if (static_cast<long>(millis() - nextWebPollAtMs_) >= 0)
+  {
+    server_.handleClient();
+    nextWebPollAtMs_ = millis() + kWebPollIntervalMs;
   }
 }
 
@@ -259,12 +261,13 @@ void WebOtaBlinkApp::startFallbackAp()
 // ------------------------------------------------------------
 void WebOtaBlinkApp::registerRoutes()
 {
-  server_.on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
-  server_.on("/save-wifi", HTTP_POST,
-             [this](AsyncWebServerRequest* request) { handleSaveWifi(request); });
-  server_.on("/reboot", HTTP_GET,
-             [this](AsyncWebServerRequest* request) { handleReboot(request); });
-  server_.onNotFound([this](AsyncWebServerRequest* request) { handleNotFound(request); });
+  server_.on("/", HTTP_GET, [this]() { handleRoot(); });
+  server_.on("/save-wifi", HTTP_POST, [this]() { handleSaveWifi(); });
+  server_.on("/reboot", HTTP_GET, [this]() { handleReboot(); });
+  server_.on("/update", HTTP_GET, [this]() { handleOtaPage(); });
+  server_.on("/update", HTTP_POST, [this]() { handleOtaDone(); },
+             [this]() { handleOtaUpload(); });
+  server_.onNotFound([this]() { handleNotFound(); });
 }
 
 void WebOtaBlinkApp::handleRoot(AsyncWebServerRequest* request)
@@ -302,17 +305,81 @@ void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
   html += "<p>Device will reboot and retry the Wi-Fi list.</p>";
   html += "</body></html>";
 
-  request->send(200, "text/html; charset=utf-8", html);
+  server_.send(200, "text/html; charset=utf-8", html);
   restartScheduled_ = true;
   restartAtMs_ = millis() + 800;
 }
 
 void WebOtaBlinkApp::handleReboot(AsyncWebServerRequest* request)
 {
-  request->send(200, "text/html; charset=utf-8",
-                "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
+  server_.send(200, "text/html; charset=utf-8",
+               "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
   restartScheduled_ = true;
   restartAtMs_ = millis() + 500;
+}
+
+void WebOtaBlinkApp::handleOtaPage()
+{
+  String html;
+  html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<title>Web OTA</title></head><body style='font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;'>";
+  html += "<h1>Firmware Update</h1>";
+  html += "<form method='POST' action='/update' enctype='multipart/form-data'>";
+  html += "<input type='file' name='firmware' accept='.bin' required>";
+  html += "<button type='submit'>Upload</button>";
+  html += "</form>";
+  html += "</body></html>";
+  server_.send(200, "text/html; charset=utf-8", html);
+}
+
+void WebOtaBlinkApp::handleOtaUpload()
+{
+  HTTPUpload& upload = server_.upload();
+
+  if (upload.status == UPLOAD_FILE_START)
+  {
+    otaUploadOk_ = Update.begin(UPDATE_SIZE_UNKNOWN);
+  }
+  else if (upload.status == UPLOAD_FILE_WRITE)
+  {
+    if (otaUploadOk_)
+    {
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
+      {
+        otaUploadOk_ = false;
+      }
+    }
+  }
+  else if (upload.status == UPLOAD_FILE_END)
+  {
+    if (otaUploadOk_)
+    {
+      otaUploadOk_ = Update.end(true);
+    }
+  }
+}
+
+void WebOtaBlinkApp::handleOtaDone()
+{
+  String html;
+  html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<title>OTA Result</title></head><body style='font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;'>";
+
+  if (otaUploadOk_)
+  {
+    html += "<h1>Update successful</h1><p>Rebooting...</p>";
+    restartScheduled_ = true;
+    restartAtMs_ = millis() + 1200;
+  }
+  else
+  {
+    html += "<h1>Update failed</h1><p>Check firmware binary and try again.</p>";
+  }
+
+  html += "</body></html>";
+  server_.send(200, "text/html; charset=utf-8", html);
 }
 
 void WebOtaBlinkApp::handleNotFound(AsyncWebServerRequest* request)
