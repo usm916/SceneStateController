@@ -722,7 +722,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += ".mono{font-family:monospace;}";
   html += ".grid{display:grid;grid-template-columns:160px 1fr;gap:8px 12px;align-items:center;}";
   html += ".remote-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}";
-  html += ".remote-grid button{width:100%;margin-top:0;padding:20px 14px;background:rgb(217,217,217);color:rgb(26,26,26);border-color:#999;}";
+  html += ".remote-grid button{width:100%;margin-top:0;padding:60px 14px;background:rgb(217,217,217);color:rgb(26,26,26);border-color:#999;font-size:1.3em;}";
   html += ".remote-grid .empty{visibility:hidden;}";
   html += ".remote-grid button.power-button{background:rgb(200,40,40);}";
   html += ".toggle-on{background:rgb(77,77,77)!important;}";
