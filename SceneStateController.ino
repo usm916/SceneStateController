@@ -33,6 +33,10 @@ static uint32_t s_manual_spin_press_start_ms = 0;
 static uint32_t s_manual_spin_decel_start_ms = 0;
 static uint16_t s_manual_spin_decel_start_speed = 0;
 static uint16_t s_manual_spin_current_speed = 0;
+static uint32_t s_motor_timer_last_ms = 0;
+static uint32_t s_led_timer_last_ms = 0;
+static constexpr uint16_t kMotorTimerIntervalMs = 1;
+static constexpr uint16_t kLedTimerIntervalMs = 10;
 
 static void apply_led_override(uint8_t pattern_id);
 static bool mode_is(uint8_t mode);
@@ -42,6 +46,9 @@ static uint16_t calc_ramp_up_speed(uint32_t now_ms);
 static uint16_t calc_ramp_down_speed(uint32_t now_ms);
 static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
 static uint16_t manual_spin_speed_cap();
+static bool timer_due(uint32_t now_ms, uint32_t* last_ms, uint16_t interval_ms);
+static void run_motor_timer(uint32_t now_ms);
+static void run_led_timer(uint32_t now_ms);
 
 static uint16_t manual_spin_speed_cap() {
   const float move_speed_f = elevator_move_max_speed();
@@ -119,6 +126,35 @@ static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec) {
   } else if (dir < 0) {
     elevator_command_spin_ccw(speed_steps_per_sec);
   }
+}
+
+static bool timer_due(uint32_t now_ms, uint32_t* last_ms, uint16_t interval_ms) {
+  if (*last_ms == 0 || (uint32_t)(now_ms - *last_ms) >= interval_ms) {
+    *last_ms = now_ms;
+    return true;
+  }
+  return false;
+}
+
+static void run_motor_timer(uint32_t now_ms) {
+  if (!mode_is(3)) return;
+  if (!timer_due(now_ms, &s_motor_timer_last_ms, kMotorTimerIntervalMs)) return;
+
+  Event ev_e = {EVT_NONE, 0, {}};
+  elevator_tick(now_ms, &ev_e);
+  if (ev_e.type != EVT_NONE) {
+    if (s_runtime_mode == 3) {
+      pi_link_send_event(ev_e);
+    } else {
+      scene_handle_event(ev_e);
+    }
+  }
+}
+
+static void run_led_timer(uint32_t now_ms) {
+  if (!mode_is(2)) return;
+  if (!timer_due(now_ms, &s_led_timer_last_ms, kLedTimerIntervalMs)) return;
+  led_tick(now_ms);
 }
 
 void setup() {
@@ -265,23 +301,9 @@ void loop() {
     }
   }
 
-  if (mode_is(3)) {
-    now_ms = millis();
-    Event ev_e;
-    elevator_tick(now_ms, &ev_e);
-    if (ev_e.type != EVT_NONE) {
-      if (s_runtime_mode == 3) {
-        pi_link_send_event(ev_e);
-      } else {
-        scene_handle_event(ev_e);
-      }
-    }
-  }
-
-  if (mode_is(2)) {
-    now_ms = millis();
-    led_tick(now_ms);
-  }
+  now_ms = millis();
+  run_motor_timer(now_ms);
+  run_led_timer(now_ms);
 
   if (s_runtime_mode == 0) {
     now_ms = millis();
