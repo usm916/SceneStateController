@@ -35,6 +35,9 @@ private:
   bool restartScheduled_ = false;
   unsigned long restartAtMs_ = 0;
   bool otaUploadOk_ = false;
+  bool webPrevToggleOn_ = false;
+  bool webNextToggleOn_ = false;
+  unsigned long nextWebToggleInjectAtMs_ = 0;
 
   void loadSettings();
   void saveSettings();
@@ -51,6 +54,7 @@ private:
   void handleSaveWifi(AsyncWebServerRequest* request);
   void handleSaveControl(AsyncWebServerRequest* request);
   void handlePressButton(AsyncWebServerRequest* request);
+  void handleSetToggle(AsyncWebServerRequest* request);
   void handleReboot(AsyncWebServerRequest* request);
   void handleOtaPage(AsyncWebServerRequest* request);
   void handleOtaUpload(AsyncWebServerRequest* request, const String& filename,
