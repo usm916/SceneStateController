@@ -6,6 +6,7 @@ static const char kControllerSettingsSectionTemplate[] = R"HTML(
 
 #include <Update.h>
 #include <esp_wifi.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -710,10 +711,30 @@ String WebOtaBlinkApp::makeHtml() const
   };
 
 
-  auto textColorForBg = [](const SscRgbColor& color) -> const char*
+  auto redFromWebColor = [](uint32_t webColor) -> uint8_t
   {
-    const uint16_t brightness = (uint16_t)color.r * 299 + (uint16_t)color.g * 587 + (uint16_t)color.b * 114;
-    return (brightness >= 128000) ? "#111111" : "#ffffff";
+    return (uint8_t)((webColor >> 16) & 0xFF);
+  };
+  auto greenFromWebColor = [](uint32_t webColor) -> uint8_t
+  {
+    return (uint8_t)((webColor >> 8) & 0xFF);
+  };
+  auto blueFromWebColor = [](uint32_t webColor) -> uint8_t
+  {
+    return (uint8_t)(webColor & 0xFF);
+  };
+  auto webColorCssText = [](uint32_t webColor) -> String
+  {
+    char buf[8] = {0};
+    snprintf(buf, sizeof(buf), "#%06lX", (unsigned long)(webColor & 0xFFFFFFUL));
+    return String(buf);
+  };
+  auto textColorForBg = [&](uint32_t webColor) -> const char*
+  {
+    const uint8_t r = redFromWebColor(webColor);
+    const uint8_t g = greenFromWebColor(webColor);
+    const uint8_t b = blueFromWebColor(webColor);
+    return (r < 128 || g < 128 || b < 128) ? "rgba(255,255,255,1.0)" : "rgba(255,255,255,0.2)";
   };
 
   String html;
@@ -745,7 +766,7 @@ String WebOtaBlinkApp::makeHtml() const
   {
     const char* key = SSC_WEB_REMOTE_BUTTON_KEYS[i];
     const char* label = SSC_WEB_REMOTE_BUTTON_LABELS[i];
-    const SscRgbColor color = SSC_WEB_REMOTE_BUTTON_COLORS[i];
+    const uint32_t webColor = SSC_WEB_REMOTE_BUTTON_COLORS[i].webColor;
     const bool toggleButton = isToggleKey(key);
 
     html += "<button type='button'";
@@ -765,14 +786,10 @@ String WebOtaBlinkApp::makeHtml() const
       }
     }
 
-    html += " style='background:rgb(";
-    html += String(color.r);
-    html += ",";
-    html += String(color.g);
-    html += ",";
-    html += String(color.b);
-    html += ");color:";
-    html += textColorForBg(color);
+    html += " style='background:";
+    html += webColorCssText(webColor);
+    html += ";color:";
+    html += textColorForBg(webColor);
     html += ";'";
 
     html += " onclick=\"";

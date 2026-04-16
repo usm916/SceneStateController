@@ -77,13 +77,11 @@
 
 // Web remote UI customization
 // - Change labels in SSC_WEB_REMOTE_BUTTON_LABELS to rename displayed button text.
-// - Change colors in SSC_WEB_REMOTE_BUTTON_COLORS to set each button color in RGB.
+// - Change colors in SSC_WEB_REMOTE_BUTTON_COLORS to set each button color in webColor (0xRRGGBB).
 // - Keep count/order aligned across KEYS/LABELS/COLORS.
-struct SscRgbColor
+struct SscWebColor
 {
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
+  uint32_t webColor;
 };
 
 constexpr size_t SSC_WEB_REMOTE_BUTTON_COUNT = 21;
@@ -108,14 +106,14 @@ constexpr const char* SSC_WEB_REMOTE_BUTTON_LABELS[SSC_WEB_REMOTE_BUTTON_COUNT] 
   "7", "8", "9",
 };
 
-constexpr SscRgbColor SSC_WEB_REMOTE_BUTTON_COLORS[SSC_WEB_REMOTE_BUTTON_COUNT] = {
-  {245, 128, 128}, {245, 245, 245}, {245, 245, 245},
-  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
-  {245, 245, 245}, {245, 245, 255}, {245, 245, 255},
-  {245, 245, 245}, {245, 255, 245}, {245, 255, 245},
-  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
-  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
-  {245, 245, 245}, {245, 245, 245}, {245, 245, 245},
+constexpr SscWebColor SSC_WEB_REMOTE_BUTTON_COLORS[SSC_WEB_REMOTE_BUTTON_COUNT] = {
+  {0xF58080}, {0xF5F5F5}, {0xF5F5F5},
+  {0xF5F5F5}, {0xF5F5F5}, {0xF5F5F5},
+  {0xF5F5F5}, {0xF5F5FF}, {0xF5F5FF},
+  {0xF5F5F5}, {0xF5FFF5}, {0xF5FFF5},
+  {0xF5F5F5}, {0xF5F5F5}, {0xF5F5F5},
+  {0xF5F5F5}, {0xF5F5F5}, {0xF5F5F5},
+  {0xF5F5F5}, {0xF5F5F5}, {0xF5F5F5},
 };
 
 static_assert(sizeof(SSC_WEB_REMOTE_BUTTON_KEYS) / sizeof(SSC_WEB_REMOTE_BUTTON_KEYS[0]) == SSC_WEB_REMOTE_BUTTON_COUNT,
