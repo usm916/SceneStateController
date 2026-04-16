@@ -2,6 +2,11 @@
 
 #include <Update.h>
 #include <esp_wifi.h>
+#include <stdlib.h>
+
+#include "button_position_store.h"
+#include "elevator_module.h"
+#include "tmc2209_module.h"
 
 // ------------------------------------------------------------
 // public
@@ -257,6 +262,7 @@ void WebOtaBlinkApp::registerRoutes()
 {
   server_.on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
   server_.on("/save-wifi", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveWifi(request); });
+  server_.on("/save-control", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveControl(request); });
   server_.on("/reboot", HTTP_GET, [this](AsyncWebServerRequest* request) { handleReboot(request); });
   server_.on("/update", HTTP_GET, [this](AsyncWebServerRequest* request) { handleOtaPage(request); });
   server_.on("/update", HTTP_POST,
@@ -315,6 +321,78 @@ void WebOtaBlinkApp::handleReboot(AsyncWebServerRequest* request)
                 "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
   restartScheduled_ = true;
   restartAtMs_ = millis() + 500;
+}
+
+void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
+{
+  bool updated = false;
+
+  int32_t runCurrentMa = 0;
+  if (parseIntParam(request, "tmc_run_current_ma", &runCurrentMa))
+  {
+    if (runCurrentMa >= 1 && runCurrentMa <= 2000)
+    {
+      tmc2209_set_run_current_ma((uint16_t)runCurrentMa);
+      updated = true;
+    }
+  }
+
+  int32_t holdCurrentPct = 0;
+  if (parseIntParam(request, "tmc_hold_current_pct", &holdCurrentPct))
+  {
+    if (holdCurrentPct >= 0 && holdCurrentPct <= 100)
+    {
+      tmc2209_set_hold_current_pct((uint8_t)holdCurrentPct);
+      updated = true;
+    }
+  }
+
+  int32_t speedStepsPerSec = 0;
+  if (parseIntParam(request, "move_max_speed_steps_per_sec", &speedStepsPerSec))
+  {
+    if (speedStepsPerSec > 0 && elevator_set_move_max_speed((float)speedStepsPerSec))
+    {
+      updated = true;
+    }
+  }
+
+  int32_t accelStepsPerSec2 = 0;
+  if (parseIntParam(request, "move_accel_steps_per_sec2", &accelStepsPerSec2))
+  {
+    if (accelStepsPerSec2 > 0 && elevator_set_move_acceleration((float)accelStepsPerSec2))
+    {
+      updated = true;
+    }
+  }
+
+  int32_t zeroSteps = 0;
+  if (parseIntParam(request, "btn_zero_steps", &zeroSteps))
+  {
+    button_position_store_set_zero(zeroSteps);
+    updated = true;
+  }
+
+  for (int i = 0; i <= 9; ++i)
+  {
+    const String key = "btn_" + String(i) + "_relative_steps";
+    int32_t relativeSteps = 0;
+    if (parseIntParam(request, key, &relativeSteps))
+    {
+      if (button_position_store_record_relative((uint8_t)i, relativeSteps))
+      {
+        updated = true;
+      }
+    }
+  }
+
+  if (updated)
+  {
+    (void)tmc2209_save_current_settings();
+    (void)elevator_save_motion_profile();
+    (void)button_position_store_save();
+  }
+
+  request->redirect("/");
 }
 
 void WebOtaBlinkApp::handleOtaPage(AsyncWebServerRequest* request)
@@ -434,6 +512,25 @@ String WebOtaBlinkApp::customMacText() const
   return String(buf);
 }
 
+bool WebOtaBlinkApp::parseIntParam(AsyncWebServerRequest* request, const String& key, int32_t* out_value) const
+{
+  if (request == nullptr || out_value == nullptr) return false;
+  if (!request->hasParam(key, true)) return false;
+
+  const AsyncWebParameter* p = request->getParam(key, true);
+  if (p == nullptr) return false;
+
+  const String v = p->value();
+  if (v.length() == 0) return false;
+
+  char* endp = nullptr;
+  const long parsed = strtol(v.c_str(), &endp, 10);
+  if (endp == v.c_str() || *endp != '\0') return false;
+
+  *out_value = (int32_t)parsed;
+  return true;
+}
+
 String WebOtaBlinkApp::makeHtml() const
 {
   String html;
@@ -500,6 +597,47 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div class='box'><h2>OTA</h2>";
   html += "<a class='btn' href='/update'>Open Web OTA</a>";
   html += "</div>";
+
+  html += "<div class='box'><h2>Controller Settings</h2>";
+  html += "<form method='POST' action='/save-control'>";
+  html += "<label>TMC run current (mA)</label>";
+  html += "<input name='tmc_run_current_ma' type='number' min='1' max='2000' value='";
+  html += String(tmc2209_run_current_ma());
+  html += "'>";
+  html += "<label>TMC hold current (%)</label>";
+  html += "<input name='tmc_hold_current_pct' type='number' min='0' max='100' value='";
+  html += String(tmc2209_hold_current_pct());
+  html += "'>";
+  html += "<label>Move max speed (steps/sec)</label>";
+  html += "<input name='move_max_speed_steps_per_sec' type='number' min='1' value='";
+  html += String((int32_t)elevator_move_max_speed());
+  html += "'>";
+  html += "<label>Move acceleration (steps/sec²)</label>";
+  html += "<input name='move_accel_steps_per_sec2' type='number' min='1' value='";
+  html += String((int32_t)elevator_move_acceleration());
+  html += "'>";
+  html += "<label>Button zero steps (mute equivalent)</label>";
+  html += "<input name='btn_zero_steps' type='number' value='";
+  html += String(button_position_store_zero_steps());
+  html += "'>";
+
+  for (int i = 0; i <= 9; ++i)
+  {
+    int32_t relativeSteps = 0;
+    const bool hasValue = button_position_store_relative((uint8_t)i, &relativeSteps);
+    html += "<label>BTN_";
+    html += String(i);
+    html += " relative steps</label>";
+    html += "<input name='btn_";
+    html += String(i);
+    html += "_relative_steps' type='number' value='";
+    html += hasValue ? String(relativeSteps) : "";
+    html += "' placeholder='Not set'>";
+  }
+
+  html += "<p class='small'>INFOやserial/IRで更新可能な値をここから書き換えできます。保存時にNVSへ永続化します。</p>";
+  html += "<button type='submit'>Save Controller Settings</button>";
+  html += "</form></div>";
 
   html += "<div class='box'><h2>Actions</h2>";
   html += "<a class='btn' href='/reboot'>Reboot</a>";

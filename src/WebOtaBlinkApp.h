@@ -49,6 +49,7 @@ private:
 
   void handleRoot(AsyncWebServerRequest* request);
   void handleSaveWifi(AsyncWebServerRequest* request);
+  void handleSaveControl(AsyncWebServerRequest* request);
   void handleReboot(AsyncWebServerRequest* request);
   void handleOtaPage(AsyncWebServerRequest* request);
   void handleOtaUpload(AsyncWebServerRequest* request, const String& filename,
@@ -61,4 +62,5 @@ private:
   String currentModeText() const;
   String currentIpText() const;
   String customMacText() const;
+  bool parseIntParam(AsyncWebServerRequest* request, const String& key, int32_t* out_value) const;
 };
