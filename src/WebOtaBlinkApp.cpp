@@ -39,8 +39,17 @@ void WebOtaBlinkApp::begin()
 
 void WebOtaBlinkApp::loop()
 {
-  server_.handleClient();
-  ElegantOTA.loop();
+  if (restartScheduled_ && static_cast<long>(millis() - restartAtMs_) >= 0)
+  {
+    ESP.restart();
+  }
+
+  if (static_cast<long>(millis() - nextWebPollAtMs_) >= 0)
+  {
+    server_.handleClient();
+    ElegantOTA.loop();
+    nextWebPollAtMs_ = millis() + kWebPollIntervalMs;
+  }
 }
 
 // ------------------------------------------------------------
@@ -293,16 +302,16 @@ void WebOtaBlinkApp::handleSaveWifi()
   html += "</body></html>";
 
   server_.send(200, "text/html; charset=utf-8", html);
-  delay(800);
-  ESP.restart();
+  restartScheduled_ = true;
+  restartAtMs_ = millis() + 800;
 }
 
 void WebOtaBlinkApp::handleReboot()
 {
   server_.send(200, "text/html; charset=utf-8",
                "<!DOCTYPE html><html><body><h1>Rebooting...</h1></body></html>");
-  delay(500);
-  ESP.restart();
+  restartScheduled_ = true;
+  restartAtMs_ = millis() + 500;
 }
 
 void WebOtaBlinkApp::handleNotFound()

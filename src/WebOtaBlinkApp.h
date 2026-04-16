@@ -15,6 +15,7 @@ private:
   static constexpr int kMaxWifiSlots = 3;
   static constexpr int kWifiRetryPerSsid = 3;
   static constexpr unsigned long kWifiConnectTimeoutMs = 8000;
+  static constexpr unsigned long kWebPollIntervalMs = 5;
 
   struct WifiSlot
   {
@@ -32,6 +33,9 @@ private:
   const char* fallbackApPass_ = "12345678";
 
   uint8_t customStaMac_[6] = {0x02, 0x10, 0x00, 0x00, 0x00, 0x01};
+  bool restartScheduled_ = false;
+  unsigned long restartAtMs_ = 0;
+  unsigned long nextWebPollAtMs_ = 0;
 
   void loadSettings();
   void saveSettings();
