@@ -1,7 +1,7 @@
 #include "WebOtaBlinkApp.h"
 
 static const char kControllerSettingsSectionTemplate[] =
-#include "web_controller_settings_section.html"
+#include "web_controller_settings_section.h"
 ;
 
 #include <Update.h>
