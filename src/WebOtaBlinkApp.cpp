@@ -1,8 +1,8 @@
 #include "WebOtaBlinkApp.h"
 
-static const char kControllerSettingsSectionTemplate[] = R"HTML(
+static const char kControllerSettingsSectionTemplate[] =
 #include "web_controller_settings_section.html"
-)HTML";
+;
 
 #include <Update.h>
 #include <esp_wifi.h>
