@@ -68,7 +68,7 @@ void scene_tick(uint32_t now_ms) {
 
   if (s_scene == SCENE_ARRIVED) {
     if (s_arrived_ms == 0) s_arrived_ms = now_ms;
-    if (now_ms - s_arrived_ms > 1500) {
+    if (now_ms - s_arrived_ms > 3000) {
       s_arrived_ms = 0;
       set_scene(SCENE_IDLE);
     }

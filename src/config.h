@@ -90,6 +90,24 @@ struct SscWebColor
   uint32_t webColor;
 };
 
+struct SscRgbColor
+{
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+};
+
+constexpr SscRgbColor SSC_LED_STRIP_BASE_COLORS[SSC_LED_STRIP_COUNT] = {
+  {56, 32, 32},  // strip 0 (warm white red tint)
+  {32, 56, 32},  // strip 1 (warm white green tint)
+  {32, 32, 56},  // strip 2 (cool white blue tint)
+  {56, 48, 32},  // strip 3 (warm amber-ish white)
+  {48, 32, 56},  // strip 4 (violet-ish white)
+  {32, 52, 52},  // strip 5 (cyan-ish white)
+};
+static_assert(sizeof(SSC_LED_STRIP_BASE_COLORS) / sizeof(SSC_LED_STRIP_BASE_COLORS[0]) == SSC_LED_STRIP_COUNT,
+              "SSC_LED_STRIP_BASE_COLORS count mismatch");
+
 constexpr size_t SSC_WEB_REMOTE_BUTTON_COUNT = 21;
 
 constexpr const char* SSC_WEB_REMOTE_BUTTON_KEYS[SSC_WEB_REMOTE_BUTTON_COUNT] = {

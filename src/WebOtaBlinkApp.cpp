@@ -399,6 +399,18 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     updated = true;
   }
 
+  int32_t ledGlobalBrightnessPct = 0;
+  if (parseIntParam(request, "led_global_brightness_pct", &ledGlobalBrightnessPct))
+  {
+    if (ledGlobalBrightnessPct >= 0 && ledGlobalBrightnessPct <= 100)
+    {
+      if (led_set_global_brightness_pct((uint8_t)ledGlobalBrightnessPct))
+      {
+        updated = true;
+      }
+    }
+  }
+
   for (int i = 0; i <= 9; ++i)
   {
     const String key = "btn_" + String(i) + "_relative_steps";
@@ -507,9 +519,13 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
   {
     scene = LEDSCENE_BLINK;
   }
+  else if (value == "RANDOM")
+  {
+    scene = LEDSCENE_RANDOM_LONG_BLINK_THEN_ON;
+  }
   else
   {
-    request->send(400, "text/plain; charset=utf-8", "scene must be SOLID/CHASE/BLINK");
+    request->send(400, "text/plain; charset=utf-8", "scene must be SOLID/CHASE/BLINK/RANDOM");
     return;
   }
 
@@ -753,6 +769,7 @@ String WebOtaBlinkApp::renderControllerSettingsSection() const
   section.replace("{{MOVE_MAX_SPEED_STEPS_PER_SEC}}", String((int32_t)elevator_move_max_speed()));
   section.replace("{{MOVE_ACCEL_STEPS_PER_SEC2}}", String((int32_t)elevator_move_acceleration()));
   section.replace("{{BTN_ZERO_STEPS}}", String(button_position_store_zero_steps()));
+  section.replace("{{LED_GLOBAL_BRIGHTNESS_PCT}}", String(led_global_brightness_pct()));
 
   String relativeRows;
   for (int i = 0; i <= 9; ++i)
@@ -953,10 +970,12 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<option value='SOLID'>SOLID</option>";
   html += "<option value='CHASE'>CHASE</option>";
   html += "<option value='BLINK'>BLINK</option>";
+  html += "<option value='RANDOM'>RANDOM</option>";
   html += "</select>";
   html += "<button type='button' onclick='setStripScene()'>Apply strip scene</button>";
   html += "</div>";
-  html += "<p class='small'>Serial command: LEDSCENE &lt;0..5|ALL&gt; &lt;SOLID|CHASE|BLINK&gt;</p>";
+  html += "<p class='small'>Serial command: LEDSCENE &lt;0..5|ALL&gt; &lt;SOLID|CHASE|BLINK|RANDOM&gt;</p>";
+  html += "<p class='small'>Serial brightness command: brightness_&lt;0..100&gt;</p>";
   html += "</div>";
 
   html += "<div class='box'><h2>Actions</h2>";
