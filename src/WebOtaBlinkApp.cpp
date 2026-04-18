@@ -14,6 +14,7 @@ static const char kControllerSettingsSectionTemplate[] =
 #include "config.h"
 #include "elevator_module.h"
 #include "ir_module.h"
+#include "led_module.h"
 #include "tmc2209_module.h"
 
 // ------------------------------------------------------------
@@ -286,6 +287,7 @@ void WebOtaBlinkApp::registerRoutes()
   server_.on("/", HTTP_GET, [this](AsyncWebServerRequest* request) { handleRoot(request); });
   server_.on("/save-wifi", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveWifi(request); });
   server_.on("/save-control", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveControl(request); });
+  server_.on("/led-control", HTTP_POST, [this](AsyncWebServerRequest* request) { handleLedControl(request); });
   server_.on("/press-btn", HTTP_POST, [this](AsyncWebServerRequest* request) { handlePressButton(request); });
   server_.on("/set-toggle", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSetToggle(request); });
   server_.on("/reboot", HTTP_GET, [this](AsyncWebServerRequest* request) { handleReboot(request); });
@@ -444,6 +446,75 @@ void WebOtaBlinkApp::handlePressButton(AsyncWebServerRequest* request)
 
   ir_inject_button((RemoteButton)buttonCode, 300);
   request->send(200, "text/plain; charset=utf-8", String("Sent: ") + btnParam->value());
+}
+
+void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
+{
+  if (request == nullptr) {
+    return;
+  }
+
+  int32_t pattern = -1;
+  if (parseIntParam(request, "pattern", &pattern))
+  {
+    if (pattern >= 0 && pattern <= 3)
+    {
+      led_set_pattern((LedPattern)pattern);
+      request->send(200, "text/plain; charset=utf-8", "pattern updated");
+      return;
+    }
+    request->send(400, "text/plain; charset=utf-8", "pattern must be 0..3");
+    return;
+  }
+
+  int32_t stripIndex = 0;
+  if (!parseIntParam(request, "strip", &stripIndex))
+  {
+    request->send(400, "text/plain; charset=utf-8", "missing strip");
+    return;
+  }
+
+  if (stripIndex < 0 || stripIndex >= SSC_LED_STRIP_COUNT)
+  {
+    request->send(400, "text/plain; charset=utf-8", "strip out of range");
+    return;
+  }
+
+  if (!request->hasParam("scene", true))
+  {
+    request->send(400, "text/plain; charset=utf-8", "missing scene");
+    return;
+  }
+
+  const AsyncWebParameter* sceneParam = request->getParam("scene", true);
+  if (sceneParam == nullptr)
+  {
+    request->send(400, "text/plain; charset=utf-8", "invalid scene");
+    return;
+  }
+
+  LedStripScene scene = LEDSCENE_SOLID;
+  const String value = sceneParam->value();
+  if (value == "SOLID")
+  {
+    scene = LEDSCENE_SOLID;
+  }
+  else if (value == "CHASE")
+  {
+    scene = LEDSCENE_CHASE;
+  }
+  else if (value == "BLINK")
+  {
+    scene = LEDSCENE_BLINK;
+  }
+  else
+  {
+    request->send(400, "text/plain; charset=utf-8", "scene must be SOLID/CHASE/BLINK");
+    return;
+  }
+
+  led_set_strip_scene((uint8_t)stripIndex, scene);
+  request->send(200, "text/plain; charset=utf-8", "strip scene updated");
 }
 
 void WebOtaBlinkApp::handleSetToggle(AsyncWebServerRequest* request)
@@ -856,6 +927,38 @@ String WebOtaBlinkApp::makeHtml() const
 
   html += renderControllerSettingsSection();
 
+  html += "<div class='box'><h2>LED Scene Control</h2>";
+  html += "<div id='led-status' class='small'>Ready</div>";
+  html += "<div class='grid'>";
+  html += "<div>Scene pattern</div><div>";
+  html += "<button type='button' onclick='setLedPattern(0)'>IDLE</button> ";
+  html += "<button type='button' onclick='setLedPattern(1)'>MOVING</button> ";
+  html += "<button type='button' onclick='setLedPattern(2)'>ARRIVED</button> ";
+  html += "<button type='button' onclick='setLedPattern(3)'>ERROR</button>";
+  html += "</div>";
+  html += "</div>";
+  html += "<div style='margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;'>";
+  html += "<label for='led-strip'>Strip</label>";
+  html += "<select id='led-strip'>";
+  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
+    html += "<option value='";
+    html += String(strip);
+    html += "'>";
+    html += String(strip);
+    html += "</option>";
+  }
+  html += "</select>";
+  html += "<label for='led-scene'>Scene</label>";
+  html += "<select id='led-scene'>";
+  html += "<option value='SOLID'>SOLID</option>";
+  html += "<option value='CHASE'>CHASE</option>";
+  html += "<option value='BLINK'>BLINK</option>";
+  html += "</select>";
+  html += "<button type='button' onclick='setStripScene()'>Apply strip scene</button>";
+  html += "</div>";
+  html += "<p class='small'>Serial command: LEDSCENE &lt;0..5|ALL&gt; &lt;SOLID|CHASE|BLINK&gt;</p>";
+  html += "</div>";
+
   html += "<div class='box'><h2>Actions</h2>";
   html += "<a class='btn' href='/reboot'>Reboot</a>";
   html += "</div>";
@@ -871,10 +974,13 @@ String WebOtaBlinkApp::makeHtml() const
 
   html += "<script>";
   html += "function setStatus(msg,isErr){const s=document.getElementById('remote-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
+  html += "function setLedStatus(msg,isErr){const s=document.getElementById('led-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
   html += "function postForm(url,data){return fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams(data)});}";
   html += "function syncToggleUi(active){const p=document.getElementById('toggle-prev');const n=document.getElementById('toggle-next');if(p)p.classList.toggle('toggle-on',active==='BTN_PREV');if(n)n.classList.toggle('toggle-on',active==='BTN_NEXT');}";
   html += "async function sendBtn(btn){try{const r=await postForm('/press-btn',{btn:btn});const t=await r.text();setStatus((r.ok?t:('Send failed: '+t)),!r.ok);}catch(e){setStatus('Send failed: '+e,true);}}";
   html += "async function toggleBtn(btn,el){const on=!el.classList.contains('toggle-on');try{const r=await postForm('/set-toggle',{btn:btn,on:on?'1':'0'});const t=await r.text();if(r.ok){syncToggleUi(on?btn:'');setStatus(t,false);}else{setStatus('Toggle failed: '+t,true);}}catch(e){setStatus('Toggle failed: '+e,true);}}";
+  html += "async function setLedPattern(pattern){try{const r=await postForm('/led-control',{pattern:String(pattern)});const t=await r.text();setLedStatus((r.ok?('Pattern set: '+pattern):('Pattern failed: '+t)),!r.ok);}catch(e){setLedStatus('Pattern failed: '+e,true);}}";
+  html += "async function setStripScene(){const strip=document.getElementById('led-strip').value;const scene=document.getElementById('led-scene').value;try{const r=await postForm('/led-control',{strip:strip,scene:scene});const t=await r.text();setLedStatus((r.ok?('Strip '+strip+' -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "syncToggleUi('";
   if (webPrevToggleOn_)
   {
