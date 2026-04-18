@@ -4,14 +4,17 @@
 #include "elevator_module.h"
 #include "ir_module.h"
 #include "scene_controller.h"
+#include "led_module.h"
+#include "config.h"
 #include "shared_serial.h"
 #include "tmc2209_module.h"
 #include "button_position_store.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 namespace {
-char s_serial_line[24] = {0};
+char s_serial_line[64] = {0};
 SharedSerialCursor s_serial_cursor = {0};
 bool s_cursor_initialized = false;
 
@@ -45,6 +48,23 @@ bool parse_rec_command(const char* line, uint8_t len, uint8_t* out_index,
   }
 
   return button_position_store_parse_button_token(btn_token, out_index);
+}
+
+bool parse_led_scene_token(const char* token, LedStripScene* out_scene) {
+  if (token == nullptr || out_scene == nullptr) return false;
+  if (strcmp(token, "SOLID") == 0 || strcmp(token, "solid") == 0) {
+    *out_scene = LEDSCENE_SOLID;
+    return true;
+  }
+  if (strcmp(token, "CHASE") == 0 || strcmp(token, "chase") == 0) {
+    *out_scene = LEDSCENE_CHASE;
+    return true;
+  }
+  if (strcmp(token, "BLINK") == 0 || strcmp(token, "blink") == 0) {
+    *out_scene = LEDSCENE_BLINK;
+    return true;
+  }
+  return false;
 }
 
 void print_system_info() {
@@ -131,6 +151,36 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       out_event->data.led.pattern_id = (uint8_t)pattern;
       return true;
     }
+  }
+  if (len >= 10 && (strncmp(line, "LEDSCENE ", 9) == 0 || strncmp(line, "ledscene ", 9) == 0)) {
+    char scope[8] = {0};
+    char sceneToken[8] = {0};
+    if (sscanf(line + 9, "%7s %7s", scope, sceneToken) == 2) {
+      LedStripScene scene = LEDSCENE_SOLID;
+      if (!parse_led_scene_token(sceneToken, &scene)) {
+        Serial.println("LEDSCENE scene must be SOLID/CHASE/BLINK");
+        return false;
+      }
+
+      if (strcmp(scope, "ALL") == 0 || strcmp(scope, "all") == 0) {
+        for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
+          led_set_strip_scene(strip, scene);
+        }
+        Serial.println("LEDSCENE ALL updated");
+        return false;
+      }
+
+      int32_t stripIndex = 0;
+      if (parse_int(scope, stripIndex) && stripIndex >= 0 && stripIndex < SSC_LED_STRIP_COUNT) {
+        led_set_strip_scene((uint8_t)stripIndex, scene);
+        Serial.print("LEDSCENE strip=");
+        Serial.print(stripIndex);
+        Serial.println(" updated");
+        return false;
+      }
+    }
+    Serial.println("LEDSCENE usage: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK>");
+    return false;
   }
   if (len >= 9 && strncmp(line, "TMC RUN ", 8) == 0) {
     int32_t current_ma = 0;

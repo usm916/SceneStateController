@@ -3,7 +3,12 @@
 #include <stdint.h>
 
 #define SSC_PIN_IR            23
-#define SSC_PIN_WS2812B       18
+#define SSC_PIN_WS2812B_0     18
+#define SSC_PIN_WS2812B_1     19
+#define SSC_PIN_WS2812B_2     21
+#define SSC_PIN_WS2812B_3     22
+#define SSC_PIN_WS2812B_4     32
+#define SSC_PIN_WS2812B_5     33
 
 #define SSC_PIN_STEP          26
 #define SSC_PIN_DIR           27
@@ -23,7 +28,8 @@
 // #define SSC_TMC_UART_PIN      17
 // #define SSC_TMC_UART_BAUD     115200
 
-#define SSC_LED_COUNT         100
+#define SSC_LED_STRIP_COUNT   6
+#define SSC_LED_STRIP_LEN     72
 #define SSC_LED_BRIGHTNESS    64
 
 #define SSC_STEPS_PER_FLOOR   25600

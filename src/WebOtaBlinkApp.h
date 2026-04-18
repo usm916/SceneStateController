@@ -53,6 +53,7 @@ private:
   void handleRoot(AsyncWebServerRequest* request);
   void handleSaveWifi(AsyncWebServerRequest* request);
   void handleSaveControl(AsyncWebServerRequest* request);
+  void handleLedControl(AsyncWebServerRequest* request);
   void handlePressButton(AsyncWebServerRequest* request);
   void handleSetToggle(AsyncWebServerRequest* request);
   void handleReboot(AsyncWebServerRequest* request);
