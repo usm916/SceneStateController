@@ -331,7 +331,7 @@ void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
 
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
-  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>";
   html += "<title>Saved</title></head><body style='font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;'>";
   html += "<h1>Wi-Fi settings saved</h1>";
   html += "<p>Device will reboot and retry the Wi-Fi list.</p>";
@@ -583,7 +583,7 @@ void WebOtaBlinkApp::handleOtaPage(AsyncWebServerRequest* request)
 {
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
-  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>";
   html += "<title>Web OTA</title></head><body style='font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;'>";
   html += "<h1>Firmware Update</h1>";
   html += "<form method='POST' action='/update' enctype='multipart/form-data'>";
@@ -623,7 +623,7 @@ void WebOtaBlinkApp::handleOtaDone(AsyncWebServerRequest* request)
 {
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
-  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>";
   html += "<title>OTA Result</title></head><body style='font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;'>";
 
   if (otaUploadOk_)
@@ -827,10 +827,10 @@ String WebOtaBlinkApp::makeHtml() const
 
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
-  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>";
   html += "<title>ESP32 Setup</title>";
   html += "<style>";
-  html += "body{font-family:Arial,sans-serif;max-width:820px;margin:24px auto;padding:0 16px;line-height:1.5;}";
+  html += "body{font-family:Arial,sans-serif;max-width:820px;margin:24px auto;padding:0 16px;line-height:1.5;touch-action:manipulation;}";
   html += ".box{border:1px solid #ccc;border-radius:10px;padding:16px;margin-bottom:16px;}";
   html += "input{width:100%;padding:10px;font-size:16px;box-sizing:border-box;margin-top:4px;}";
   html += "button,a.btn{display:inline-block;padding:10px 14px;margin-top:12px;text-decoration:none;border:1px solid #333;border-radius:8px;background:#f5f5f5;color:#000;}";
@@ -978,6 +978,12 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<p class='small'>Serial brightness command: brightness_&lt;0..100&gt;</p>";
   html += "</div>";
 
+  html += "<div class='box'><h2>Screen Awake (Experimental)</h2>";
+  html += "<div id='wake-status' class='small'>Checking support...</div>";
+  html += "<button id='wake-toggle' type='button' onclick='toggleWakeLock()' disabled>Keep screen awake</button>";
+  html += "<p class='small'>対応ブラウザではこのページ表示中の画面スリープを抑止します。タブ非表示時やOS状態によって解除される場合があります。</p>";
+  html += "</div>";
+
   html += "<div class='box'><h2>Actions</h2>";
   html += "<a class='btn' href='/reboot'>Reboot</a>";
   html += "</div>";
@@ -994,8 +1000,18 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<script>";
   html += "function setStatus(msg,isErr){const s=document.getElementById('remote-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
   html += "function setLedStatus(msg,isErr){const s=document.getElementById('led-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
+  html += "function setWakeStatus(msg,isErr){const s=document.getElementById('wake-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
   html += "function postForm(url,data){return fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams(data)});}";
   html += "function syncToggleUi(active){const p=document.getElementById('toggle-prev');const n=document.getElementById('toggle-next');if(p)p.classList.toggle('toggle-on',active==='BTN_PREV');if(n)n.classList.toggle('toggle-on',active==='BTN_NEXT');}";
+  html += "let wakeLockSentinel=null;";
+  html += "let wakeLockRequested=false;";
+  html += "function isWakeLockSupported(){return typeof navigator!=='undefined'&&'wakeLock' in navigator;}";
+  html += "function updateWakeToggleUi(){const btn=document.getElementById('wake-toggle');if(!btn)return;const active=!!wakeLockSentinel;btn.disabled=!isWakeLockSupported();btn.textContent=active?'Allow screen sleep':'Keep screen awake';}";
+  html += "async function requestWakeLock(){if(!isWakeLockSupported()){setWakeStatus('Wake Lock API is not supported on this browser.',true);updateWakeToggleUi();return false;}try{wakeLockSentinel=await navigator.wakeLock.request('screen');wakeLockSentinel.addEventListener('release',()=>{wakeLockSentinel=null;updateWakeToggleUi();if(wakeLockRequested&&document.visibilityState==='visible'){setWakeStatus('Wake lock was released. Retrying...',true);requestWakeLock();return;}setWakeStatus('Screen may sleep now.',false);});setWakeStatus('Screen wake lock is active.',false);updateWakeToggleUi();return true;}catch(e){wakeLockSentinel=null;setWakeStatus('Wake lock failed: '+e,true);updateWakeToggleUi();return false;}}";
+  html += "async function releaseWakeLock(){wakeLockRequested=false;if(wakeLockSentinel){try{await wakeLockSentinel.release();}catch(e){setWakeStatus('Release failed: '+e,true);return;}wakeLockSentinel=null;}setWakeStatus('Screen may sleep now.',false);updateWakeToggleUi();}";
+  html += "async function toggleWakeLock(){if(wakeLockSentinel){await releaseWakeLock();return;}wakeLockRequested=true;await requestWakeLock();}";
+  html += "document.addEventListener('visibilitychange',async()=>{if(document.visibilityState!=='visible')return;if(wakeLockRequested&&!wakeLockSentinel){await requestWakeLock();}});";
+  html += "function initWakeLockUi(){if(!isWakeLockSupported()){setWakeStatus('Wake Lock API is not supported on this browser. 画面を常時表示したい場合は端末設定の自動ロック時間を調整してください。',true);updateWakeToggleUi();return;}setWakeStatus('Wake lock available. Tap the button to keep screen awake.',false);updateWakeToggleUi();}";
   html += "async function sendBtn(btn){try{const r=await postForm('/press-btn',{btn:btn});const t=await r.text();setStatus((r.ok?t:('Send failed: '+t)),!r.ok);}catch(e){setStatus('Send failed: '+e,true);}}";
   html += "async function toggleBtn(btn,el){const on=!el.classList.contains('toggle-on');try{const r=await postForm('/set-toggle',{btn:btn,on:on?'1':'0'});const t=await r.text();if(r.ok){syncToggleUi(on?btn:'');setStatus(t,false);}else{setStatus('Toggle failed: '+t,true);}}catch(e){setStatus('Toggle failed: '+e,true);}}";
   html += "async function setLedPattern(pattern){try{const r=await postForm('/led-control',{pattern:String(pattern)});const t=await r.text();setLedStatus((r.ok?('Pattern set: '+pattern):('Pattern failed: '+t)),!r.ok);}catch(e){setLedStatus('Pattern failed: '+e,true);}}";
@@ -1010,6 +1026,7 @@ String WebOtaBlinkApp::makeHtml() const
     html += "BTN_NEXT";
   }
   html += "');";
+  html += "initWakeLockUi();";
   html += "</script>";
 
   html += "</body></html>";
