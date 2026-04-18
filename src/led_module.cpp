@@ -20,11 +20,11 @@ static constexpr LedStripScene kIdleScenes[SSC_LED_STRIP_COUNT] = {
 
 static constexpr LedStripScene kMovingScenes[SSC_LED_STRIP_COUNT] = {
   LEDSCENE_CHASE,
-  LEDSCENE_SOLID,
   LEDSCENE_CHASE,
-  LEDSCENE_SOLID,
   LEDSCENE_CHASE,
-  LEDSCENE_SOLID,
+  LEDSCENE_CHASE,
+  LEDSCENE_CHASE,
+  LEDSCENE_CHASE,
 };
 
 static constexpr LedStripScene kArrivedScenes[SSC_LED_STRIP_COUNT] = {
