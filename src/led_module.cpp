@@ -1,5 +1,6 @@
 #include "led_module.h"
 #include "config.h"
+#include <Arduino.h>
 #include <FastLED.h>
 
 static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
@@ -27,12 +28,12 @@ static constexpr LedStripScene kMovingScenes[SSC_LED_STRIP_COUNT] = {
 };
 
 static constexpr LedStripScene kArrivedScenes[SSC_LED_STRIP_COUNT] = {
-  LEDSCENE_SOLID,
-  LEDSCENE_BLINK,
-  LEDSCENE_SOLID,
-  LEDSCENE_BLINK,
-  LEDSCENE_SOLID,
-  LEDSCENE_BLINK,
+  LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
+  LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
+  LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
+  LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
+  LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
+  LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
 };
 
 static constexpr LedStripScene kErrorScenes[SSC_LED_STRIP_COUNT] = {
@@ -47,17 +48,26 @@ static constexpr LedStripScene kErrorScenes[SSC_LED_STRIP_COUNT] = {
 static uint32_t s_last_ms = 0;
 static uint16_t s_chase_pos[SSC_LED_STRIP_COUNT] = {0};
 static bool s_blink_on = false;
+static uint8_t s_global_brightness_pct = 100;
+static uint32_t s_scene_start_ms = 0;
+static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{0}};
+static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
 
 static CRGB strip_base_color(uint8_t strip_index) {
-  switch (strip_index) {
-    case 0: return CRGB(40, 0, 0);    // Red
-    case 1: return CRGB(0, 40, 0);    // Green
-    case 2: return CRGB(0, 0, 40);    // Blue
-    case 3: return CRGB(40, 28, 0);   // Amber
-    case 4: return CRGB(24, 0, 40);   // Purple
-    case 5: return CRGB(0, 32, 32);   // Cyan
-    default: return CRGB(16, 16, 16);
-  }
+  if (strip_index >= SSC_LED_STRIP_COUNT) return CRGB(16, 16, 16);
+  const SscRgbColor& c = SSC_LED_STRIP_BASE_COLORS[strip_index];
+  return CRGB(c.r, c.g, c.b);
+}
+
+static CRGB apply_brightness(const CRGB& base, uint8_t brightness) {
+  CRGB scaled = base;
+  scaled.nscale8_video(brightness);
+  return scaled;
+}
+
+static uint8_t to_fastled_master_brightness(uint8_t brightness_pct) {
+  const uint16_t scaled = ((uint16_t)SSC_LED_BRIGHTNESS * brightness_pct) / 100;
+  return (uint8_t)scaled;
 }
 
 static void add_strip_controller(uint8_t strip_index) {
@@ -86,13 +96,15 @@ static void add_strip_controller(uint8_t strip_index) {
 }
 
 void led_setup() {
+  randomSeed(micros());
+
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
     s_strip_scenes[strip] = LEDSCENE_SOLID;
     s_chase_pos[strip] = 0;
   }
 
-  FastLED.setBrightness(SSC_LED_BRIGHTNESS);
+  FastLED.setBrightness(to_fastled_master_brightness(s_global_brightness_pct));
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
     for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
       s_leds[strip][i] = CRGB::Black;
@@ -101,10 +113,25 @@ void led_setup() {
   FastLED.show();
 }
 
+bool led_set_global_brightness_pct(uint8_t brightness_pct) {
+  if (brightness_pct > 100) return false;
+  s_global_brightness_pct = brightness_pct;
+  FastLED.setBrightness(to_fastled_master_brightness(s_global_brightness_pct));
+  return true;
+}
+
+uint8_t led_global_brightness_pct() {
+  return s_global_brightness_pct;
+}
+
 static void apply_scene_profile(const LedStripScene* profile) {
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
     s_strip_scenes[strip] = profile[strip];
     s_chase_pos[strip] = 0;
+    for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
+      s_random_led_on[strip][i] = false;
+      s_random_next_toggle_ms[strip][i] = 0;
+    }
   }
 }
 
@@ -112,6 +139,7 @@ void led_set_pattern(LedPattern p) {
   s_pattern = p;
   s_last_ms = 0;
   s_blink_on = false;
+  s_scene_start_ms = millis();
 
   switch (p) {
     case LEDP_MOVING:
@@ -142,27 +170,56 @@ static void paint_strip_solid(uint8_t strip_index, const CRGB& color) {
   }
 }
 
-static void paint_strip_chase(uint8_t strip_index, const CRGB& color) {
+static void paint_strip_chase(uint8_t strip_index, const CRGB& base) {
   for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
     s_leds[strip_index][i] = CRGB::Black;
   }
-  s_leds[strip_index][s_chase_pos[strip_index] % SSC_LED_STRIP_LEN] = color;
+  s_leds[strip_index][s_chase_pos[strip_index] % SSC_LED_STRIP_LEN] = apply_brightness(base, 255);
   s_chase_pos[strip_index]++;
 }
 
-static void render_strip(uint8_t strip_index) {
+static void paint_strip_random_long_blink_then_on(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
+  const bool settle_on = (now_ms - s_scene_start_ms) >= 3000;
+
+  for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
+    if (settle_on) {
+      s_leds[strip_index][i] = apply_brightness(base, 255);
+      continue;
+    }
+
+    if (s_random_next_toggle_ms[strip_index][i] == 0) {
+      s_random_led_on[strip_index][i] = (random(0, 100) < 30);
+      s_random_next_toggle_ms[strip_index][i] = now_ms + (uint32_t)random(120, 650);
+    } else if (now_ms >= s_random_next_toggle_ms[strip_index][i]) {
+      s_random_led_on[strip_index][i] = !s_random_led_on[strip_index][i];
+      s_random_next_toggle_ms[strip_index][i] = now_ms + (uint32_t)random(180, 800);
+    }
+
+    s_leds[strip_index][i] = apply_brightness(base, s_random_led_on[strip_index][i] ? 255 : 0);
+  }
+}
+
+static void render_strip(uint8_t strip_index, uint32_t now_ms) {
   const CRGB base = strip_base_color(strip_index);
+  const CRGB error_color = CRGB(64, 0, 0);
 
   switch (s_strip_scenes[strip_index]) {
     case LEDSCENE_CHASE:
       paint_strip_chase(strip_index, base);
       break;
     case LEDSCENE_BLINK:
-      paint_strip_solid(strip_index, s_blink_on ? base : CRGB::Black);
+      if (s_pattern == LEDP_ERROR) {
+        paint_strip_solid(strip_index, s_blink_on ? error_color : CRGB::Black);
+      } else {
+        paint_strip_solid(strip_index, s_blink_on ? apply_brightness(base, 255) : CRGB::Black);
+      }
+      break;
+    case LEDSCENE_RANDOM_LONG_BLINK_THEN_ON:
+      paint_strip_random_long_blink_then_on(strip_index, base, now_ms);
       break;
     case LEDSCENE_SOLID:
     default:
-      paint_strip_solid(strip_index, base);
+      paint_strip_solid(strip_index, apply_brightness(base, 255));
       break;
   }
 }
@@ -171,7 +228,7 @@ void led_tick(uint32_t now_ms) {
   const uint32_t interval_ms =
       (s_pattern == LEDP_MOVING) ? 40 :
       (s_pattern == LEDP_ERROR) ? 200 :
-      (s_pattern == LEDP_ARRIVED) ? 250 : 0;
+      (s_pattern == LEDP_ARRIVED) ? 50 : 0;
 
   if (interval_ms != 0) {
     if (now_ms - s_last_ms < interval_ms) return;
@@ -189,7 +246,7 @@ void led_tick(uint32_t now_ms) {
   }
 
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
-    render_strip(strip);
+    render_strip(strip, now_ms);
   }
 
   FastLED.show();

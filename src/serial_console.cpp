@@ -64,6 +64,11 @@ bool parse_led_scene_token(const char* token, LedStripScene* out_scene) {
     *out_scene = LEDSCENE_BLINK;
     return true;
   }
+  if (strcmp(token, "RANDOM") == 0 || strcmp(token, "random") == 0 ||
+      strcmp(token, "RANDOM_LONG") == 0 || strcmp(token, "random_long") == 0) {
+    *out_scene = LEDSCENE_RANDOM_LONG_BLINK_THEN_ON;
+    return true;
+  }
   return false;
 }
 
@@ -93,6 +98,8 @@ void print_system_info() {
   Serial.println(elevator_motor_lag_max_interval_ms());
   Serial.print("motor_lag_accumulated_ms=");
   Serial.println(elevator_motor_lag_accumulated_ms());
+  Serial.print("led_global_brightness_pct=");
+  Serial.println(led_global_brightness_pct());
   Serial.print("calibration_valid=");
   Serial.println(elevator_has_valid_calibration() ? 1 : 0);
   Serial.print("calibration_in_progress=");
@@ -158,7 +165,7 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     if (sscanf(line + 9, "%7s %7s", scope, sceneToken) == 2) {
       LedStripScene scene = LEDSCENE_SOLID;
       if (!parse_led_scene_token(sceneToken, &scene)) {
-        Serial.println("LEDSCENE scene must be SOLID/CHASE/BLINK");
+        Serial.println("LEDSCENE scene must be SOLID/CHASE/BLINK/RANDOM");
         return false;
       }
 
@@ -179,7 +186,19 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
         return false;
       }
     }
-    Serial.println("LEDSCENE usage: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK>");
+    Serial.println("LEDSCENE usage: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM>");
+    return false;
+  }
+  if ((len >= 12 && strncmp(line, "brightness_", 11) == 0) ||
+      (len >= 12 && strncmp(line, "BRIGHTNESS_", 11) == 0)) {
+    int32_t brightness_pct = 0;
+    if (parse_int(line + 11, brightness_pct) && brightness_pct >= 0 && brightness_pct <= 100) {
+      led_set_global_brightness_pct((uint8_t)brightness_pct);
+      Serial.print("brightness=");
+      Serial.println(led_global_brightness_pct());
+      return false;
+    }
+    Serial.println("brightness format: brightness_<0..100>");
     return false;
   }
   if (len >= 9 && strncmp(line, "TMC RUN ", 8) == 0) {
