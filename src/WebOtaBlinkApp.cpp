@@ -1021,7 +1021,6 @@ String WebOtaBlinkApp::makeHtml() const
     html += "'>";
   }
 
-  html += "async function setStripSceneAll(scene){try{const r=await postForm('/led-control',{strip:'ALL',scene:scene});const t=await r.text();setLedStatus((r.ok?('All strips -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "<p class='small'>保存後に再起動し、各SSIDを3回ずつ順番に試します。DHCPで接続します。</p>";
   html += "<button type='submit'>Save Wi-Fi Settings</button>";
   html += "</form></div>";
