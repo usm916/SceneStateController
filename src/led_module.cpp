@@ -266,7 +266,7 @@ static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const C
 
   if (s_crash_next_toggle_ms[strip_index] == 0) {
     s_crash_on[strip_index] = (random(0, 100) < 50);
-    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(160, 840);
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(80, 360);
   } else if (now_ms >= s_crash_next_toggle_ms[strip_index]) {
     s_crash_on[strip_index] = !s_crash_on[strip_index];
     s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(240, 1040);
