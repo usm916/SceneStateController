@@ -113,6 +113,7 @@ void led_setup() {
   }
 
   FastLED.setBrightness(to_fastled_master_brightness(s_global_brightness_pct));
+  FastLED.setDither(1);
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
     for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
       s_leds[strip][i] = CRGB::Black;
@@ -235,15 +236,24 @@ static void paint_strip_random_long_blink_then_on(uint8_t strip_index, const CRG
   }
 }
 
+static uint8_t smoothstep_progress_8(uint32_t elapsed_ms, uint32_t duration_ms) {
+  if (elapsed_ms >= duration_ms) return 255;
+  const uint32_t t_q10 = (elapsed_ms * 1024UL) / duration_ms;  // 0..1023
+  const uint32_t t2_q10 = (t_q10 * t_q10) >> 10;
+  const uint32_t t3_q10 = (t2_q10 * t_q10) >> 10;
+  const uint32_t eased_q10 = (3UL * t2_q10) - (2UL * t3_q10);  // smoothstep
+  return (uint8_t)((eased_q10 * 255UL + 511UL) / 1023UL);
+}
+
 static void paint_strip_fade_in_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const uint8_t brightness = (elapsed_ms >= 3000) ? 255 : (uint8_t)((elapsed_ms * 255UL) / 3000UL);
+  const uint8_t brightness = smoothstep_progress_8(elapsed_ms, 3000UL);
   paint_strip_solid(strip_index, apply_brightness(base, brightness));
 }
 
 static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const uint8_t brightness = (elapsed_ms >= 3000) ? 0 : (uint8_t)(255 - ((elapsed_ms * 255UL) / 3000UL));
+  const uint8_t brightness = (uint8_t)(255 - smoothstep_progress_8(elapsed_ms, 3000UL));
   paint_strip_solid(strip_index, apply_brightness(base, brightness));
 }
 
@@ -255,11 +265,16 @@ static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const C
   }
 
   if (s_crash_next_toggle_ms[strip_index] == 0) {
-    s_crash_on[strip_index] = (random(0, 100) < 50);
-    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(80, 420);
+    s_crash_on[strip_index] = (random(0, 100) < 75);
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(10, 45);
   } else if (now_ms >= s_crash_next_toggle_ms[strip_index]) {
-    s_crash_on[strip_index] = !s_crash_on[strip_index];
-    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(120, 520);
+    s_crash_on[strip_index] = (random(0, 100) < 68);
+    uint32_t next_span_ms = s_crash_on[strip_index] ? (uint32_t)random(12, 60)
+                                                    : (uint32_t)random(8, 35);
+    if (random(0, 100) < 12) {
+      next_span_ms += (uint32_t)random(70, 170);
+    }
+    s_crash_next_toggle_ms[strip_index] = now_ms + next_span_ms;
   }
 
   paint_strip_solid(strip_index, s_crash_on[strip_index] ? apply_brightness(base, 255) : CRGB::Black);
