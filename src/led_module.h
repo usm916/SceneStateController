@@ -27,4 +27,6 @@ bool led_set_global_brightness_pct(uint8_t brightness_pct);
 uint8_t led_global_brightness_pct();
 void led_load_saved_brightness();
 bool led_save_global_brightness_pct();
+void led_set_updates_enabled(bool enabled);
+bool led_updates_enabled();
 void led_tick(uint32_t now_ms);

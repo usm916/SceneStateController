@@ -132,6 +132,7 @@ void setup() {
   button_position_store_setup();
   s_runtime_mode = SSC_MODE;
   ensure_modules_for_mode(s_runtime_mode);
+  led_set_updates_enabled(false);
   s_log.print_startup(s_runtime_mode);
 }
 
