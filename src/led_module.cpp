@@ -315,6 +315,13 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
   }
 }
 
+static bool has_blink_scene_active() {
+  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+    if (s_strip_scenes[strip] == LEDSCENE_BLINK) return true;
+  }
+  return false;
+}
+
 void led_tick(uint32_t now_ms) {
   const uint32_t interval_ms = 1000UL / (uint32_t)SSC_LED_TARGET_FPS;
   if (interval_ms == 0) return;
@@ -329,7 +336,7 @@ void led_tick(uint32_t now_ms) {
   s_last_ms += interval_ms;
   if ((now_ms - s_last_ms) >= interval_ms) s_last_ms = now_ms;
 
-  if (s_pattern == LEDP_ERROR || s_pattern == LEDP_ARRIVED) {
+  if (s_pattern == LEDP_ERROR || s_pattern == LEDP_ARRIVED || has_blink_scene_active()) {
     const uint32_t blink_interval_ms = (s_pattern == LEDP_ERROR) ? 200UL : 50UL;
     if (s_blink_last_toggle_ms == 0 || (now_ms - s_blink_last_toggle_ms) >= blink_interval_ms) {
       s_blink_on = !s_blink_on;
