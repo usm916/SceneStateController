@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
+#include "scene_state.h"
 
 class WebOtaBlinkApp
 {
@@ -54,6 +55,7 @@ private:
   void handleSaveWifi(AsyncWebServerRequest* request);
   void handleSaveControl(AsyncWebServerRequest* request);
   void handleLedControl(AsyncWebServerRequest* request);
+  void handleSceneControl(AsyncWebServerRequest* request);
   void handlePressButton(AsyncWebServerRequest* request);
   void handleSetToggle(AsyncWebServerRequest* request);
   void handleReboot(AsyncWebServerRequest* request);
@@ -70,5 +72,6 @@ private:
   String currentIpText() const;
   String customMacText() const;
   bool parseIntParam(AsyncWebServerRequest* request, const String& key, int32_t* out_value) const;
+  bool parseSceneParam(const String& key, SceneId* out_scene) const;
   bool parseRemoteButtonParam(const String& key, uint8_t* out_button_code) const;
 };
