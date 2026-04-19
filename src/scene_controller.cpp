@@ -10,16 +10,16 @@ static int32_t s_target_floor = 0;
 
 SceneId scene_current() { return s_scene; }
 
-static void set_scene(SceneId s) {
-  if (s_scene == s) return;
+static void set_scene(SceneId s, bool force_replay = false) {
+  if (!force_replay && s_scene == s) return;
   s_scene = s;
   ssc_send_scene(Serial, scene_name(s_scene));
 
   switch (s_scene) {
-    case SCENE_IDLE:    led_set_pattern(LEDP_IDLE);    break;
-    case SCENE_MOVE:    led_set_pattern(LEDP_MOVING);  break;
-    case SCENE_ARRIVED: led_set_pattern(LEDP_ARRIVED); break;
-    case SCENE_ERROR:   led_set_pattern(LEDP_ERROR);   break;
+    case SCENE_IDLE:    led_set_pattern(LEDP_IDLE, force_replay);    break;
+    case SCENE_MOVE:    led_set_pattern(LEDP_MOVING, force_replay);  break;
+    case SCENE_ARRIVED: led_set_pattern(LEDP_ARRIVED, force_replay); break;
+    case SCENE_ERROR:   led_set_pattern(LEDP_ERROR, force_replay);   break;
     default: break;
   }
 }
@@ -27,7 +27,7 @@ static void set_scene(SceneId s) {
 void scene_setup() {
   s_scene = SCENE_IDLE;
   s_target_floor = 0;
-  set_scene(SCENE_IDLE);
+  set_scene(SCENE_IDLE, true);
 }
 
 bool scene_select(SceneId s) {
@@ -36,7 +36,7 @@ bool scene_select(SceneId s) {
     case SCENE_MOVE:
     case SCENE_ARRIVED:
     case SCENE_ERROR:
-      set_scene(s);
+      set_scene(s, true);
       return true;
     default:
       return false;

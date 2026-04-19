@@ -171,8 +171,8 @@ static void apply_scene_profile(const LedStripScene* profile) {
   }
 }
 
-void led_set_pattern(LedPattern p) {
-  if (s_pattern == p) return;
+void led_set_pattern(LedPattern p, bool force_reset) {
+  if (!force_reset && s_pattern == p) return;
   s_pattern = p;
   s_last_ms = 0;
   s_blink_on = false;

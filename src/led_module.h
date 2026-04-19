@@ -21,7 +21,7 @@ enum LedStripScene : uint8_t {
 };
 
 void led_setup();
-void led_set_pattern(LedPattern p);
+void led_set_pattern(LedPattern p, bool force_reset = false);
 void led_set_strip_scene(uint8_t strip_index, LedStripScene scene);
 bool led_set_global_brightness_pct(uint8_t brightness_pct);
 uint8_t led_global_brightness_pct();
