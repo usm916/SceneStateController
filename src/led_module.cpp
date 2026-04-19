@@ -5,6 +5,7 @@
 #include <Preferences.h>
 
 static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
+static_assert(SSC_LED_TARGET_FPS > 0, "SSC_LED_TARGET_FPS must be greater than 0.");
 
 static CRGB s_leds[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN];
 static LedPattern s_pattern = LEDP_IDLE;
@@ -49,6 +50,7 @@ static constexpr LedStripScene kErrorScenes[SSC_LED_STRIP_COUNT] = {
 static uint32_t s_last_ms = 0;
 static uint16_t s_chase_pos[SSC_LED_STRIP_COUNT] = {0};
 static bool s_blink_on = false;
+static uint32_t s_blink_last_toggle_ms = 0;
 static uint8_t s_global_brightness_pct = 100;
 static constexpr const char* kLedPrefsNamespace = "led";
 static constexpr const char* kLedBrightnessKey = "brightness";
@@ -111,6 +113,7 @@ void led_setup() {
   }
 
   FastLED.setBrightness(to_fastled_master_brightness(s_global_brightness_pct));
+  FastLED.setDither(1);
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
     for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
       s_leds[strip][i] = CRGB::Black;
@@ -166,6 +169,7 @@ void led_set_pattern(LedPattern p) {
   s_pattern = p;
   s_last_ms = 0;
   s_blink_on = false;
+  s_blink_last_toggle_ms = 0;
 
   switch (p) {
     case LEDP_MOVING:
@@ -232,15 +236,24 @@ static void paint_strip_random_long_blink_then_on(uint8_t strip_index, const CRG
   }
 }
 
+static uint8_t smoothstep_progress_8(uint32_t elapsed_ms, uint32_t duration_ms) {
+  if (elapsed_ms >= duration_ms) return 255;
+  const uint32_t t_q10 = (elapsed_ms * 1024UL) / duration_ms;  // 0..1023
+  const uint32_t t2_q10 = (t_q10 * t_q10) >> 10;
+  const uint32_t t3_q10 = (t2_q10 * t_q10) >> 10;
+  const uint32_t eased_q10 = (3UL * t2_q10) - (2UL * t3_q10);  // smoothstep
+  return (uint8_t)((eased_q10 * 255UL + 511UL) / 1023UL);
+}
+
 static void paint_strip_fade_in_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const uint8_t brightness = (elapsed_ms >= 3000) ? 255 : (uint8_t)((elapsed_ms * 255UL) / 3000UL);
+  const uint8_t brightness = smoothstep_progress_8(elapsed_ms, 3000UL);
   paint_strip_solid(strip_index, apply_brightness(base, brightness));
 }
 
 static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const uint8_t brightness = (elapsed_ms >= 3000) ? 0 : (uint8_t)(255 - ((elapsed_ms * 255UL) / 3000UL));
+  const uint8_t brightness = (uint8_t)(255 - smoothstep_progress_8(elapsed_ms, 3000UL));
   paint_strip_solid(strip_index, apply_brightness(base, brightness));
 }
 
@@ -252,11 +265,16 @@ static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const C
   }
 
   if (s_crash_next_toggle_ms[strip_index] == 0) {
-    s_crash_on[strip_index] = (random(0, 100) < 50);
-    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(80, 420);
+    s_crash_on[strip_index] = (random(0, 100) < 75);
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(10, 45);
   } else if (now_ms >= s_crash_next_toggle_ms[strip_index]) {
-    s_crash_on[strip_index] = !s_crash_on[strip_index];
-    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(120, 520);
+    s_crash_on[strip_index] = (random(0, 100) < 68);
+    uint32_t next_span_ms = s_crash_on[strip_index] ? (uint32_t)random(12, 60)
+                                                    : (uint32_t)random(8, 35);
+    if (random(0, 100) < 12) {
+      next_span_ms += (uint32_t)random(70, 170);
+    }
+    s_crash_next_toggle_ms[strip_index] = now_ms + next_span_ms;
   }
 
   paint_strip_solid(strip_index, s_crash_on[strip_index] ? apply_brightness(base, 255) : CRGB::Black);
@@ -303,22 +321,25 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
 }
 
 void led_tick(uint32_t now_ms) {
-  const uint32_t interval_ms =
-      (s_pattern == LEDP_MOVING) ? 40 :
-      (s_pattern == LEDP_ERROR) ? 200 :
-      (s_pattern == LEDP_ARRIVED) ? 50 : 0;
+  const uint32_t interval_ms = 1000UL / (uint32_t)SSC_LED_TARGET_FPS;
+  if (interval_ms == 0) return;
 
-  if (interval_ms != 0) {
-    if (now_ms - s_last_ms < interval_ms) return;
-    s_last_ms = now_ms;
-  } else if (s_last_ms != 0) {
-    return;
-  } else {
+  if (s_last_ms == 0) {
     s_last_ms = now_ms;
   }
 
+  if ((now_ms - s_last_ms) < interval_ms) {
+    return;
+  }
+  s_last_ms += interval_ms;
+  if ((now_ms - s_last_ms) >= interval_ms) s_last_ms = now_ms;
+
   if (s_pattern == LEDP_ERROR || s_pattern == LEDP_ARRIVED) {
-    s_blink_on = !s_blink_on;
+    const uint32_t blink_interval_ms = (s_pattern == LEDP_ERROR) ? 200UL : 50UL;
+    if (s_blink_last_toggle_ms == 0 || (now_ms - s_blink_last_toggle_ms) >= blink_interval_ms) {
+      s_blink_on = !s_blink_on;
+      s_blink_last_toggle_ms = now_ms;
+    }
   } else {
     s_blink_on = true;
   }
