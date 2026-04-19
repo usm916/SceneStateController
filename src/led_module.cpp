@@ -265,16 +265,11 @@ static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const C
   }
 
   if (s_crash_next_toggle_ms[strip_index] == 0) {
-    s_crash_on[strip_index] = (random(0, 100) < 75);
-    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(10, 45);
+    s_crash_on[strip_index] = (random(0, 100) < 50);
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(160, 840);
   } else if (now_ms >= s_crash_next_toggle_ms[strip_index]) {
-    s_crash_on[strip_index] = (random(0, 100) < 68);
-    uint32_t next_span_ms = s_crash_on[strip_index] ? (uint32_t)random(12, 60)
-                                                    : (uint32_t)random(8, 35);
-    if (random(0, 100) < 12) {
-      next_span_ms += (uint32_t)random(70, 170);
-    }
-    s_crash_next_toggle_ms[strip_index] = now_ms + next_span_ms;
+    s_crash_on[strip_index] = !s_crash_on[strip_index];
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(240, 1040);
   }
 
   paint_strip_solid(strip_index, s_crash_on[strip_index] ? apply_brightness(base, 255) : CRGB::Black);
