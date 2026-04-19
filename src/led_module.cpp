@@ -5,6 +5,7 @@
 #include <Preferences.h>
 
 static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
+static_assert(SSC_LED_TARGET_FPS > 0, "SSC_LED_TARGET_FPS must be greater than 0.");
 
 static CRGB s_leds[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN];
 static LedPattern s_pattern = LEDP_IDLE;
@@ -49,6 +50,7 @@ static constexpr LedStripScene kErrorScenes[SSC_LED_STRIP_COUNT] = {
 static uint32_t s_last_ms = 0;
 static uint16_t s_chase_pos[SSC_LED_STRIP_COUNT] = {0};
 static bool s_blink_on = false;
+static uint32_t s_blink_last_toggle_ms = 0;
 static uint8_t s_global_brightness_pct = 100;
 static constexpr const char* kLedPrefsNamespace = "led";
 static constexpr const char* kLedBrightnessKey = "brightness";
@@ -166,6 +168,7 @@ void led_set_pattern(LedPattern p) {
   s_pattern = p;
   s_last_ms = 0;
   s_blink_on = false;
+  s_blink_last_toggle_ms = 0;
 
   switch (p) {
     case LEDP_MOVING:
@@ -303,22 +306,25 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
 }
 
 void led_tick(uint32_t now_ms) {
-  const uint32_t interval_ms =
-      (s_pattern == LEDP_MOVING) ? 40 :
-      (s_pattern == LEDP_ERROR) ? 200 :
-      (s_pattern == LEDP_ARRIVED) ? 50 : 0;
+  const uint32_t interval_ms = 1000UL / (uint32_t)SSC_LED_TARGET_FPS;
+  if (interval_ms == 0) return;
 
-  if (interval_ms != 0) {
-    if (now_ms - s_last_ms < interval_ms) return;
-    s_last_ms = now_ms;
-  } else if (s_last_ms != 0) {
-    return;
-  } else {
+  if (s_last_ms == 0) {
     s_last_ms = now_ms;
   }
 
+  if ((now_ms - s_last_ms) < interval_ms) {
+    return;
+  }
+  s_last_ms += interval_ms;
+  if ((now_ms - s_last_ms) >= interval_ms) s_last_ms = now_ms;
+
   if (s_pattern == LEDP_ERROR || s_pattern == LEDP_ARRIVED) {
-    s_blink_on = !s_blink_on;
+    const uint32_t blink_interval_ms = (s_pattern == LEDP_ERROR) ? 200UL : 50UL;
+    if (s_blink_last_toggle_ms == 0 || (now_ms - s_blink_last_toggle_ms) >= blink_interval_ms) {
+      s_blink_on = !s_blink_on;
+      s_blink_last_toggle_ms = now_ms;
+    }
   } else {
     s_blink_on = true;
   }
