@@ -2,6 +2,7 @@
 #include "config.h"
 #include <Arduino.h>
 #include <FastLED.h>
+#include <Preferences.h>
 
 static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
 
@@ -49,6 +50,8 @@ static uint32_t s_last_ms = 0;
 static uint16_t s_chase_pos[SSC_LED_STRIP_COUNT] = {0};
 static bool s_blink_on = false;
 static uint8_t s_global_brightness_pct = 100;
+static constexpr const char* kLedPrefsNamespace = "led";
+static constexpr const char* kLedBrightnessKey = "brightness";
 static uint32_t s_scene_start_ms = 0;
 static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{0}};
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
@@ -97,6 +100,7 @@ static void add_strip_controller(uint8_t strip_index) {
 
 void led_setup() {
   randomSeed(micros());
+  led_load_saved_brightness();
 
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
@@ -117,11 +121,28 @@ bool led_set_global_brightness_pct(uint8_t brightness_pct) {
   if (brightness_pct > 100) return false;
   s_global_brightness_pct = brightness_pct;
   FastLED.setBrightness(to_fastled_master_brightness(s_global_brightness_pct));
+  FastLED.show();
   return true;
 }
 
 uint8_t led_global_brightness_pct() {
   return s_global_brightness_pct;
+}
+
+void led_load_saved_brightness() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, true)) return;
+  const uint8_t saved_brightness = prefs.getUChar(kLedBrightnessKey, s_global_brightness_pct);
+  prefs.end();
+  (void)led_set_global_brightness_pct(saved_brightness);
+}
+
+bool led_save_global_brightness_pct() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, false)) return false;
+  const size_t written = prefs.putUChar(kLedBrightnessKey, s_global_brightness_pct);
+  prefs.end();
+  return written > 0;
 }
 
 static void apply_scene_profile(const LedStripScene* profile) {

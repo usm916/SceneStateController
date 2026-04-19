@@ -429,6 +429,7 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     (void)tmc2209_save_current_settings();
     (void)elevator_save_motion_profile();
     (void)button_position_store_save();
+    (void)led_save_global_brightness_pct();
   }
 
   request->redirect("/");
@@ -463,6 +464,18 @@ void WebOtaBlinkApp::handlePressButton(AsyncWebServerRequest* request)
 void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
 {
   if (request == nullptr) {
+    return;
+  }
+
+  int32_t brightnessPct = -1;
+  if (parseIntParam(request, "brightness_pct", &brightnessPct))
+  {
+    if (brightnessPct >= 0 && brightnessPct <= 100 && led_set_global_brightness_pct((uint8_t)brightnessPct))
+    {
+      request->send(200, "text/plain; charset=utf-8", "brightness updated");
+      return;
+    }
+    request->send(400, "text/plain; charset=utf-8", "brightness_pct must be 0..100");
     return;
   }
 
@@ -1016,6 +1029,12 @@ String WebOtaBlinkApp::makeHtml() const
   html += "async function toggleBtn(btn,el){const on=!el.classList.contains('toggle-on');try{const r=await postForm('/set-toggle',{btn:btn,on:on?'1':'0'});const t=await r.text();if(r.ok){syncToggleUi(on?btn:'');setStatus(t,false);}else{setStatus('Toggle failed: '+t,true);}}catch(e){setStatus('Toggle failed: '+e,true);}}";
   html += "async function setLedPattern(pattern){try{const r=await postForm('/led-control',{pattern:String(pattern)});const t=await r.text();setLedStatus((r.ok?('Pattern set: '+pattern):('Pattern failed: '+t)),!r.ok);}catch(e){setLedStatus('Pattern failed: '+e,true);}}";
   html += "async function setStripScene(){const strip=document.getElementById('led-strip').value;const scene=document.getElementById('led-scene').value;try{const r=await postForm('/led-control',{strip:strip,scene:scene});const t=await r.text();setLedStatus((r.ok?('Strip '+strip+' -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
+  html += "let ledBrightnessApplyTimer=0;";
+  html += "let ledBrightnessReqSeq=0;";
+  html += "let ledBrightnessAckSeq=0;";
+  html += "async function applyRealtimeBrightness(v){const seq=++ledBrightnessReqSeq;try{const r=await postForm('/led-control',{brightness_pct:String(v)});const t=await r.text();if(seq<ledBrightnessAckSeq)return;ledBrightnessAckSeq=seq;setLedStatus((r.ok?('Brightness: '+v+'%'):('Brightness failed: '+t)),!r.ok);}catch(e){if(seq<ledBrightnessAckSeq)return;ledBrightnessAckSeq=seq;setLedStatus('Brightness failed: '+e,true);}}";
+  html += "function queueRealtimeBrightness(v){if(ledBrightnessApplyTimer)clearTimeout(ledBrightnessApplyTimer);ledBrightnessApplyTimer=setTimeout(()=>applyRealtimeBrightness(v),80);}";
+  html += "function initBrightnessControl(){const num=document.getElementById('led-brightness-input');const slider=document.getElementById('led-brightness-slider');if(!num||!slider)return;const clamp=(raw)=>{const n=parseInt(raw,10);if(Number.isNaN(n))return 0;return Math.max(0,Math.min(100,n));};const syncFrom=(src,dst)=>{const v=clamp(src.value);src.value=String(v);dst.value=String(v);queueRealtimeBrightness(v);};num.addEventListener('input',()=>syncFrom(num,slider));slider.addEventListener('input',()=>syncFrom(slider,num));}";
   html += "syncToggleUi('";
   if (webPrevToggleOn_)
   {
@@ -1027,6 +1046,7 @@ String WebOtaBlinkApp::makeHtml() const
   }
   html += "');";
   html += "initWakeLockUi();";
+  html += "initBrightnessControl();";
   html += "</script>";
 
   html += "</body></html>";

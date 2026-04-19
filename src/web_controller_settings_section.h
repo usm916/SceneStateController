@@ -12,7 +12,9 @@ R"HTML(
 <label>Button zero steps (mute equivalent)</label>
 <input name='btn_zero_steps' type='number' value='{{BTN_ZERO_STEPS}}'>
 <label>LED brightness (%)</label>
-<input name='led_global_brightness_pct' type='number' min='0' max='100' value='{{LED_GLOBAL_BRIGHTNESS_PCT}}'>
+<input id='led-brightness-input' name='led_global_brightness_pct' type='number' min='0' max='100' value='{{LED_GLOBAL_BRIGHTNESS_PCT}}'>
+<input id='led-brightness-slider' type='range' min='0' max='100' value='{{LED_GLOBAL_BRIGHTNESS_PCT}}'>
+<p class='small'>スライダー/数値入力はリアルタイム反映されます。SaveでNVSに保存します。</p>
 {{BTN_RELATIVE_ROWS}}
 <p class='small'>INFOやserial/IRで更新可能な値をここから書き換えできます。保存時にNVSへ永続化します。</p>
 <button type='submit'>Save Controller Settings</button>
