@@ -95,6 +95,27 @@ bool parse_led_scene_token(const char* token, LedStripScene* out_scene) {
   return false;
 }
 
+bool parse_scene_token(const char* token, SceneId* out_scene) {
+  if (token == nullptr || out_scene == nullptr) return false;
+  if (strcmp(token, "IDLE") == 0 || strcmp(token, "idle") == 0 || strcmp(token, "SCENE_IDLE") == 0) {
+    *out_scene = SCENE_IDLE;
+    return true;
+  }
+  if (strcmp(token, "MOVE") == 0 || strcmp(token, "move") == 0 || strcmp(token, "SCENE_MOVE") == 0) {
+    *out_scene = SCENE_MOVE;
+    return true;
+  }
+  if (strcmp(token, "ARRIVED") == 0 || strcmp(token, "arrived") == 0 || strcmp(token, "SCENE_ARRIVED") == 0) {
+    *out_scene = SCENE_ARRIVED;
+    return true;
+  }
+  if (strcmp(token, "ERROR") == 0 || strcmp(token, "error") == 0 || strcmp(token, "SCENE_ERROR") == 0) {
+    *out_scene = SCENE_ERROR;
+    return true;
+  }
+  return false;
+}
+
 void print_system_info() {
   Serial.println("=== SSC INFO ===");
   Serial.print("scene=");
@@ -210,6 +231,20 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       }
     }
     Serial.println("LEDSCENE usage: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
+    return false;
+  }
+  if (len >= 7 && (strncmp(line, "SCENE ", 6) == 0 || strncmp(line, "scene ", 6) == 0)) {
+    SceneId scene = SCENE_IDLE;
+    if (!parse_scene_token(line + 6, &scene)) {
+      Serial.println("SCENE usage: SCENE <IDLE|MOVE|ARRIVED|ERROR>");
+      return false;
+    }
+    if (!scene_select(scene)) {
+      Serial.println("SCENE apply failed");
+      return false;
+    }
+    Serial.print("SCENE ");
+    Serial.println(scene_name(scene_current()));
     return false;
   }
   if ((len >= 12 && strncmp(line, "brightness_", 11) == 0) ||
