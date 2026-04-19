@@ -536,9 +536,29 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
   {
     scene = LEDSCENE_RANDOM_LONG_BLINK_THEN_ON;
   }
+  else if (value == "CRASH")
+  {
+    scene = LEDSCENE_CRASH;
+  }
+  else if (value == "EMERGENCY")
+  {
+    scene = LEDSCENE_EMERGENCY_RED;
+  }
+  else if (value == "BLACKOUT")
+  {
+    scene = LEDSCENE_BLACKOUT;
+  }
+  else if (value == "FADEIN3S")
+  {
+    scene = LEDSCENE_FADE_IN_3S;
+  }
+  else if (value == "FADEOUT3S")
+  {
+    scene = LEDSCENE_FADE_OUT_3S;
+  }
   else
   {
-    request->send(400, "text/plain; charset=utf-8", "scene must be SOLID/CHASE/BLINK/RANDOM");
+    request->send(400, "text/plain; charset=utf-8", "scene must be SOLID/CHASE/BLINK/RANDOM/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
     return;
   }
 
@@ -984,10 +1004,15 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<option value='CHASE'>CHASE</option>";
   html += "<option value='BLINK'>BLINK</option>";
   html += "<option value='RANDOM'>RANDOM</option>";
+  html += "<option value='CRASH'>CRASH</option>";
+  html += "<option value='EMERGENCY'>EMERGENCY</option>";
+  html += "<option value='BLACKOUT'>BLACKOUT</option>";
+  html += "<option value='FADEIN3S'>FADEIN3S</option>";
+  html += "<option value='FADEOUT3S'>FADEOUT3S</option>";
   html += "</select>";
   html += "<button type='button' onclick='setStripScene()'>Apply strip scene</button>";
   html += "</div>";
-  html += "<p class='small'>Serial command: LEDSCENE &lt;0..5|ALL&gt; &lt;SOLID|CHASE|BLINK|RANDOM&gt;</p>";
+  html += "<p class='small'>Serial command: LEDSCENE &lt;0..5|ALL&gt; &lt;SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S&gt;</p>";
   html += "<p class='small'>Serial brightness command: brightness_&lt;0..100&gt;</p>";
   html += "</div>";
 

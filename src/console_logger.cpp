@@ -12,7 +12,7 @@ void ConsoleLogger::print_banner() {
   out_.println("Pi5 -> ESP32 commands:");
   out_.println("  MOVE <floor>");
   out_.println("  LED <pattern>  (0=IDLE 1=MOVING 2=ARRIVED 3=ERROR)");
-  out_.println("  LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM>");
+  out_.println("  LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
   out_.println("  brightness_<0..100>");
   out_.println("====================================================");
 }
@@ -48,7 +48,7 @@ void ConsoleLogger::print_mode_usage() {
   out_.println("Preset cmds: mute | rec_<btn> | rec_<btn>_<steps> | save_pref");
   out_.println("Motion cmds: speed_<steps/s> | accel_<steps/s2>");
   out_.println("Current cmd: current_<1..2000>  (TMC run current mA)");
-  out_.println("LED scene cmd: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM>");
+  out_.println("LED scene cmd: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
   out_.println("Brightness cmd: brightness_<0..100>");
   out_.println("Manual prev/next max speed follows speed_<steps/s>");
 }

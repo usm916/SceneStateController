@@ -52,7 +52,7 @@ static bool s_blink_on = false;
 static uint8_t s_global_brightness_pct = 100;
 static constexpr const char* kLedPrefsNamespace = "led";
 static constexpr const char* kLedBrightnessKey = "brightness";
-static uint32_t s_scene_start_ms = 0;
+static uint32_t s_scene_start_ms[SSC_LED_STRIP_COUNT] = {0};
 static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{0}};
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
 
@@ -146,9 +146,11 @@ bool led_save_global_brightness_pct() {
 }
 
 static void apply_scene_profile(const LedStripScene* profile) {
+  const uint32_t now_ms = millis();
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
     s_strip_scenes[strip] = profile[strip];
     s_chase_pos[strip] = 0;
+    s_scene_start_ms[strip] = now_ms;
     for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
       s_random_led_on[strip][i] = false;
       s_random_next_toggle_ms[strip][i] = 0;
@@ -160,7 +162,6 @@ void led_set_pattern(LedPattern p) {
   s_pattern = p;
   s_last_ms = 0;
   s_blink_on = false;
-  s_scene_start_ms = millis();
 
   switch (p) {
     case LEDP_MOVING:
@@ -183,6 +184,11 @@ void led_set_strip_scene(uint8_t strip_index, LedStripScene scene) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return;
   s_strip_scenes[strip_index] = scene;
   s_chase_pos[strip_index] = 0;
+  s_scene_start_ms[strip_index] = millis();
+  for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
+    s_random_led_on[strip_index][i] = false;
+    s_random_next_toggle_ms[strip_index][i] = 0;
+  }
 }
 
 static void paint_strip_solid(uint8_t strip_index, const CRGB& color) {
@@ -200,7 +206,7 @@ static void paint_strip_chase(uint8_t strip_index, const CRGB& base) {
 }
 
 static void paint_strip_random_long_blink_then_on(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
-  const bool settle_on = (now_ms - s_scene_start_ms) >= 3000;
+  const bool settle_on = (now_ms - s_scene_start_ms[strip_index]) >= 3000;
 
   for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
     if (settle_on) {
@@ -220,6 +226,18 @@ static void paint_strip_random_long_blink_then_on(uint8_t strip_index, const CRG
   }
 }
 
+static void paint_strip_fade_in_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
+  const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
+  const uint8_t brightness = (elapsed_ms >= 3000) ? 255 : (uint8_t)((elapsed_ms * 255UL) / 3000UL);
+  paint_strip_solid(strip_index, apply_brightness(base, brightness));
+}
+
+static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
+  const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
+  const uint8_t brightness = (elapsed_ms >= 3000) ? 0 : (uint8_t)(255 - ((elapsed_ms * 255UL) / 3000UL));
+  paint_strip_solid(strip_index, apply_brightness(base, brightness));
+}
+
 static void render_strip(uint8_t strip_index, uint32_t now_ms) {
   const CRGB base = strip_base_color(strip_index);
   const CRGB error_color = CRGB(64, 0, 0);
@@ -237,6 +255,21 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
       break;
     case LEDSCENE_RANDOM_LONG_BLINK_THEN_ON:
       paint_strip_random_long_blink_then_on(strip_index, base, now_ms);
+      break;
+    case LEDSCENE_CRASH:
+      paint_strip_random_long_blink_then_on(strip_index, base, now_ms);
+      break;
+    case LEDSCENE_EMERGENCY_RED:
+      paint_strip_solid(strip_index, CRGB::Red);
+      break;
+    case LEDSCENE_BLACKOUT:
+      paint_strip_solid(strip_index, CRGB::Black);
+      break;
+    case LEDSCENE_FADE_IN_3S:
+      paint_strip_fade_in_3s(strip_index, base, now_ms);
+      break;
+    case LEDSCENE_FADE_OUT_3S:
+      paint_strip_fade_out_3s(strip_index, base, now_ms);
       break;
     case LEDSCENE_SOLID:
     default:
