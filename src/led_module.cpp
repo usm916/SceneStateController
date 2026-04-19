@@ -72,6 +72,12 @@ static CRGB apply_brightness(const CRGB& base, uint8_t brightness) {
   return scaled;
 }
 
+static CRGB apply_brightness_linear(const CRGB& base, uint8_t brightness) {
+  CRGB scaled = base;
+  scaled.nscale8(brightness);
+  return scaled;
+}
+
 static uint8_t to_fastled_master_brightness(uint8_t brightness_pct) {
   const uint16_t scaled = ((uint16_t)SSC_LED_BRIGHTNESS * brightness_pct) / 100;
   return (uint8_t)scaled;
@@ -166,6 +172,7 @@ static void apply_scene_profile(const LedStripScene* profile) {
 }
 
 void led_set_pattern(LedPattern p) {
+  if (s_pattern == p) return;
   s_pattern = p;
   s_last_ms = 0;
   s_blink_on = false;
@@ -190,6 +197,7 @@ void led_set_pattern(LedPattern p) {
 
 void led_set_strip_scene(uint8_t strip_index, LedStripScene scene) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return;
+  if (s_strip_scenes[strip_index] == scene) return;
   s_strip_scenes[strip_index] = scene;
   s_chase_pos[strip_index] = 0;
   s_scene_start_ms[strip_index] = millis();
@@ -248,13 +256,13 @@ static uint8_t smoothstep_progress_8(uint32_t elapsed_ms, uint32_t duration_ms) 
 static void paint_strip_fade_in_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
   const uint8_t brightness = smoothstep_progress_8(elapsed_ms, 3000UL);
-  paint_strip_solid(strip_index, apply_brightness(base, brightness));
+  paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
 static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
   const uint8_t brightness = (uint8_t)(255 - smoothstep_progress_8(elapsed_ms, 3000UL));
-  paint_strip_solid(strip_index, apply_brightness(base, brightness));
+  paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
 static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
