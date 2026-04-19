@@ -69,6 +69,29 @@ bool parse_led_scene_token(const char* token, LedStripScene* out_scene) {
     *out_scene = LEDSCENE_RANDOM_LONG_BLINK_THEN_ON;
     return true;
   }
+  if (strcmp(token, "CRASH") == 0 || strcmp(token, "crash") == 0) {
+    *out_scene = LEDSCENE_CRASH;
+    return true;
+  }
+  if (strcmp(token, "EMERGENCY") == 0 || strcmp(token, "emergency") == 0) {
+    *out_scene = LEDSCENE_EMERGENCY_RED;
+    return true;
+  }
+  if (strcmp(token, "BLACKOUT") == 0 || strcmp(token, "blackout") == 0 ||
+      strcmp(token, "DARK") == 0 || strcmp(token, "dark") == 0) {
+    *out_scene = LEDSCENE_BLACKOUT;
+    return true;
+  }
+  if (strcmp(token, "FADEIN3S") == 0 || strcmp(token, "fadein3s") == 0 ||
+      strcmp(token, "FADE_IN_3S") == 0 || strcmp(token, "fade_in_3s") == 0) {
+    *out_scene = LEDSCENE_FADE_IN_3S;
+    return true;
+  }
+  if (strcmp(token, "FADEOUT3S") == 0 || strcmp(token, "fadeout3s") == 0 ||
+      strcmp(token, "FADE_OUT_3S") == 0 || strcmp(token, "fade_out_3s") == 0) {
+    *out_scene = LEDSCENE_FADE_OUT_3S;
+    return true;
+  }
   return false;
 }
 
@@ -161,11 +184,11 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
   }
   if (len >= 10 && (strncmp(line, "LEDSCENE ", 9) == 0 || strncmp(line, "ledscene ", 9) == 0)) {
     char scope[8] = {0};
-    char sceneToken[8] = {0};
-    if (sscanf(line + 9, "%7s %7s", scope, sceneToken) == 2) {
+    char sceneToken[16] = {0};
+    if (sscanf(line + 9, "%7s %15s", scope, sceneToken) == 2) {
       LedStripScene scene = LEDSCENE_SOLID;
       if (!parse_led_scene_token(sceneToken, &scene)) {
-        Serial.println("LEDSCENE scene must be SOLID/CHASE/BLINK/RANDOM");
+        Serial.println("LEDSCENE scene must be SOLID/CHASE/BLINK/RANDOM/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
         return false;
       }
 
@@ -186,7 +209,7 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
         return false;
       }
     }
-    Serial.println("LEDSCENE usage: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM>");
+    Serial.println("LEDSCENE usage: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
     return false;
   }
   if ((len >= 12 && strncmp(line, "brightness_", 11) == 0) ||
