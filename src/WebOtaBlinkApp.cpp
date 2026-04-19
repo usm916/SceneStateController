@@ -463,15 +463,12 @@ void WebOtaBlinkApp::handlePressButton(AsyncWebServerRequest* request)
 
 void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
 {
-  if (request == nullptr) {
-    return;
-  }
+  if (request == nullptr) return;
 
   int32_t brightnessPct = -1;
-  if (parseIntParam(request, "brightness_pct", &brightnessPct))
-  {
-    if (brightnessPct >= 0 && brightnessPct <= 100 && led_set_global_brightness_pct((uint8_t)brightnessPct))
-    {
+  if (parseIntParam(request, "brightness_pct", &brightnessPct)) {
+    if (brightnessPct >= 0 && brightnessPct <= 100 &&
+        led_set_global_brightness_pct((uint8_t)brightnessPct)) {
       request->send(200, "text/plain; charset=utf-8", "brightness updated");
       return;
     }
@@ -480,10 +477,8 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
   }
 
   int32_t pattern = -1;
-  if (parseIntParam(request, "pattern", &pattern))
-  {
-    if (pattern >= 0 && pattern <= 3)
-    {
+  if (parseIntParam(request, "pattern", &pattern)) {
+    if (pattern >= 0 && pattern <= 3) {
       led_set_pattern((LedPattern)pattern);
       request->send(200, "text/plain; charset=utf-8", "pattern updated");
       return;
@@ -492,73 +487,71 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
     return;
   }
 
-  int32_t stripIndex = 0;
-  if (!parseIntParam(request, "strip", &stripIndex))
-  {
+  if (!request->hasParam("strip", true)) {
     request->send(400, "text/plain; charset=utf-8", "missing strip");
     return;
   }
-
-  if (stripIndex < 0 || stripIndex >= SSC_LED_STRIP_COUNT)
-  {
-    request->send(400, "text/plain; charset=utf-8", "strip out of range");
+  const AsyncWebParameter* stripParam = request->getParam("strip", true);
+  if (stripParam == nullptr) {
+    request->send(400, "text/plain; charset=utf-8", "invalid strip");
     return;
   }
 
-  if (!request->hasParam("scene", true))
-  {
+  const String stripValue = stripParam->value();
+  const bool applyAllStrips = (stripValue == "ALL" || stripValue == "all");
+  int32_t stripIndex = -1;
+  if (!applyAllStrips) {
+    if (!parseIntParam(request, "strip", &stripIndex)) {
+      request->send(400, "text/plain; charset=utf-8", "strip must be 0..5 or ALL");
+      return;
+    }
+    if (stripIndex < 0 || stripIndex >= SSC_LED_STRIP_COUNT) {
+      request->send(400, "text/plain; charset=utf-8", "strip out of range");
+      return;
+    }
+  }
+
+  if (!request->hasParam("scene", true)) {
     request->send(400, "text/plain; charset=utf-8", "missing scene");
     return;
   }
-
   const AsyncWebParameter* sceneParam = request->getParam("scene", true);
-  if (sceneParam == nullptr)
-  {
+  if (sceneParam == nullptr) {
     request->send(400, "text/plain; charset=utf-8", "invalid scene");
     return;
   }
 
   LedStripScene scene = LEDSCENE_SOLID;
   const String value = sceneParam->value();
-  if (value == "SOLID")
-  {
+  if (value == "SOLID") {
     scene = LEDSCENE_SOLID;
-  }
-  else if (value == "CHASE")
-  {
+  } else if (value == "CHASE") {
     scene = LEDSCENE_CHASE;
-  }
-  else if (value == "BLINK")
-  {
+  } else if (value == "BLINK") {
     scene = LEDSCENE_BLINK;
-  }
-  else if (value == "RANDOM")
-  {
+  } else if (value == "RANDOM") {
     scene = LEDSCENE_RANDOM_LONG_BLINK_THEN_ON;
-  }
-  else if (value == "CRASH")
-  {
+  } else if (value == "CRASH") {
     scene = LEDSCENE_CRASH;
-  }
-  else if (value == "EMERGENCY")
-  {
+  } else if (value == "EMERGENCY") {
     scene = LEDSCENE_EMERGENCY_RED;
-  }
-  else if (value == "BLACKOUT")
-  {
+  } else if (value == "BLACKOUT") {
     scene = LEDSCENE_BLACKOUT;
-  }
-  else if (value == "FADEIN3S")
-  {
+  } else if (value == "FADEIN3S") {
     scene = LEDSCENE_FADE_IN_3S;
-  }
-  else if (value == "FADEOUT3S")
-  {
+  } else if (value == "FADEOUT3S") {
     scene = LEDSCENE_FADE_OUT_3S;
+  } else {
+    request->send(400, "text/plain; charset=utf-8",
+                  "scene must be SOLID/CHASE/BLINK/RANDOM/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
+    return;
   }
-  else
-  {
-    request->send(400, "text/plain; charset=utf-8", "scene must be SOLID/CHASE/BLINK/RANDOM/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
+
+  if (applyAllStrips) {
+    for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
+      led_set_strip_scene(strip, scene);
+    }
+    request->send(200, "text/plain; charset=utf-8", "all strips scene updated");
     return;
   }
 
@@ -986,10 +979,22 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<button type='button' onclick='setLedPattern(2)'>ARRIVED</button> ";
   html += "<button type='button' onclick='setLedPattern(3)'>ERROR</button>";
   html += "</div>";
+  html += "<div>Strip scene (ALL)</div><div>";
+  html += "<button type='button' onclick=\"setStripSceneAll('SOLID')\">SOLID</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('CHASE')\">CHASE</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('BLINK')\">BLINK</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('RANDOM')\">RANDOM</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('CRASH')\">CRASH</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('EMERGENCY')\">EMERGENCY</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('BLACKOUT')\">BLACKOUT</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('FADEIN3S')\">FADEIN3S</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('FADEOUT3S')\">FADEOUT3S</button>";
+  html += "</div>";
   html += "</div>";
   html += "<div style='margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;'>";
   html += "<label for='led-strip'>Strip</label>";
   html += "<select id='led-strip'>";
+  html += "<option value='ALL'>ALL</option>";
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
     html += "<option value='";
     html += String(strip);
@@ -1053,6 +1058,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "async function sendBtn(btn){try{const r=await postForm('/press-btn',{btn:btn});const t=await r.text();setStatus((r.ok?t:('Send failed: '+t)),!r.ok);}catch(e){setStatus('Send failed: '+e,true);}}";
   html += "async function toggleBtn(btn,el){const on=!el.classList.contains('toggle-on');try{const r=await postForm('/set-toggle',{btn:btn,on:on?'1':'0'});const t=await r.text();if(r.ok){syncToggleUi(on?btn:'');setStatus(t,false);}else{setStatus('Toggle failed: '+t,true);}}catch(e){setStatus('Toggle failed: '+e,true);}}";
   html += "async function setLedPattern(pattern){try{const r=await postForm('/led-control',{pattern:String(pattern)});const t=await r.text();setLedStatus((r.ok?('Pattern set: '+pattern):('Pattern failed: '+t)),!r.ok);}catch(e){setLedStatus('Pattern failed: '+e,true);}}";
+  html += "async function setStripSceneAll(scene){try{const r=await postForm('/led-control',{strip:'ALL',scene:scene});const t=await r.text();setLedStatus((r.ok?('All strips -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "async function setStripScene(){const strip=document.getElementById('led-strip').value;const scene=document.getElementById('led-scene').value;try{const r=await postForm('/led-control',{strip:strip,scene:scene});const t=await r.text();setLedStatus((r.ok?('Strip '+strip+' -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "let ledBrightnessApplyTimer=0;";
   html += "let ledBrightnessReqSeq=0;";
