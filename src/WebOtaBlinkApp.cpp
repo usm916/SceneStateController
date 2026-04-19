@@ -954,18 +954,6 @@ String WebOtaBlinkApp::makeHtml() const
         html += "'";
       }
       else if (strcmp(key, "BTN_NEXT") == 0)
-  html += "<div>Strip scene (ALL)</div><div>";
-  html += "<button type='button' onclick=\"setStripSceneAll('SOLID')\">SOLID</button> ";
-  html += "<button type='button' onclick=\"setStripSceneAll('CHASE')\">CHASE</button> ";
-  html += "<button type='button' onclick=\"setStripSceneAll('BLINK')\">BLINK</button> ";
-  html += "<button type='button' onclick=\"setStripSceneAll('RANDOM')\">RANDOM</button> ";
-  html += "<button type='button' onclick=\"setStripSceneAll('CRASH')\">CRASH</button> ";
-  html += "<button type='button' onclick=\"setStripSceneAll('EMERGENCY')\">EMERGENCY</button> ";
-  html += "<button type='button' onclick=\"setStripSceneAll('BLACKOUT')\">BLACKOUT</button> ";
-  html += "<button type='button' onclick=\"setStripSceneAll('FADEIN3S')\">FADEIN3S</button> ";
-  html += "<button type='button' onclick=\"setStripSceneAll('FADEOUT3S')\">FADEOUT3S</button>";
-  html += "</div>";
-  html += "<option value='ALL'>ALL</option>";
       {
         html += " id='toggle-next' class='";
         html += webNextToggleOn_ ? "toggle-on" : "";
