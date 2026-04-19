@@ -55,6 +55,8 @@ static constexpr const char* kLedBrightnessKey = "brightness";
 static uint32_t s_scene_start_ms[SSC_LED_STRIP_COUNT] = {0};
 static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{0}};
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
+static uint32_t s_crash_next_toggle_ms[SSC_LED_STRIP_COUNT] = {0};
+static bool s_crash_on[SSC_LED_STRIP_COUNT] = {false};
 
 static CRGB strip_base_color(uint8_t strip_index) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return CRGB(16, 16, 16);
@@ -155,6 +157,8 @@ static void apply_scene_profile(const LedStripScene* profile) {
       s_random_led_on[strip][i] = false;
       s_random_next_toggle_ms[strip][i] = 0;
     }
+    s_crash_next_toggle_ms[strip] = 0;
+    s_crash_on[strip] = false;
   }
 }
 
@@ -189,6 +193,8 @@ void led_set_strip_scene(uint8_t strip_index, LedStripScene scene) {
     s_random_led_on[strip_index][i] = false;
     s_random_next_toggle_ms[strip_index][i] = 0;
   }
+  s_crash_next_toggle_ms[strip_index] = 0;
+  s_crash_on[strip_index] = false;
 }
 
 static void paint_strip_solid(uint8_t strip_index, const CRGB& color) {
@@ -238,6 +244,24 @@ static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint3
   paint_strip_solid(strip_index, apply_brightness(base, brightness));
 }
 
+static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
+  const bool settle_on = (now_ms - s_scene_start_ms[strip_index]) >= 3000;
+  if (settle_on) {
+    paint_strip_solid(strip_index, apply_brightness(base, 255));
+    return;
+  }
+
+  if (s_crash_next_toggle_ms[strip_index] == 0) {
+    s_crash_on[strip_index] = (random(0, 100) < 50);
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(80, 420);
+  } else if (now_ms >= s_crash_next_toggle_ms[strip_index]) {
+    s_crash_on[strip_index] = !s_crash_on[strip_index];
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(120, 520);
+  }
+
+  paint_strip_solid(strip_index, s_crash_on[strip_index] ? apply_brightness(base, 255) : CRGB::Black);
+}
+
 static void render_strip(uint8_t strip_index, uint32_t now_ms) {
   const CRGB base = strip_base_color(strip_index);
   const CRGB error_color = CRGB(64, 0, 0);
@@ -257,7 +281,7 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
       paint_strip_random_long_blink_then_on(strip_index, base, now_ms);
       break;
     case LEDSCENE_CRASH:
-      paint_strip_random_long_blink_then_on(strip_index, base, now_ms);
+      paint_strip_crash_global_random_then_on(strip_index, base, now_ms);
       break;
     case LEDSCENE_EMERGENCY_RED:
       paint_strip_solid(strip_index, CRGB::Red);
