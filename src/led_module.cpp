@@ -52,6 +52,7 @@ static uint16_t s_chase_pos[SSC_LED_STRIP_COUNT] = {0};
 static bool s_blink_on = false;
 static uint32_t s_blink_last_toggle_ms = 0;
 static uint8_t s_global_brightness_pct = 100;
+static bool s_updates_enabled = false;
 static constexpr const char* kLedPrefsNamespace = "led";
 static constexpr const char* kLedBrightnessKey = "brightness";
 static uint32_t s_scene_start_ms[SSC_LED_STRIP_COUNT] = {0};
@@ -154,6 +155,25 @@ bool led_save_global_brightness_pct() {
   const size_t written = prefs.putUChar(kLedBrightnessKey, s_global_brightness_pct);
   prefs.end();
   return written > 0;
+}
+
+void led_set_updates_enabled(bool enabled) {
+  if (s_updates_enabled == enabled) return;
+  s_updates_enabled = enabled;
+  if (!s_updates_enabled) {
+    for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+      for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
+        s_leds[strip][i] = CRGB::Black;
+      }
+    }
+    FastLED.show();
+  } else {
+    s_last_ms = 0;
+  }
+}
+
+bool led_updates_enabled() {
+  return s_updates_enabled;
 }
 
 static void apply_scene_profile(const LedStripScene* profile) {
@@ -331,6 +351,7 @@ static bool has_blink_scene_active() {
 }
 
 void led_tick(uint32_t now_ms) {
+  if (!s_updates_enabled) return;
   const uint32_t interval_ms = 1000UL / (uint32_t)SSC_LED_TARGET_FPS;
   if (interval_ms == 0) return;
 
