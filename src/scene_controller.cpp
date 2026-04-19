@@ -30,6 +30,19 @@ void scene_setup() {
   set_scene(SCENE_IDLE);
 }
 
+bool scene_select(SceneId s) {
+  switch (s) {
+    case SCENE_IDLE:
+    case SCENE_MOVE:
+    case SCENE_ARRIVED:
+    case SCENE_ERROR:
+      set_scene(s);
+      return true;
+    default:
+      return false;
+  }
+}
+
 void scene_handle_event(const Event& e) {
   pi_link_send_event(e);
 
