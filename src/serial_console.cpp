@@ -170,8 +170,13 @@ void print_system_info() {
 
 bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
                         void (*set_runtime_mode_fn)(uint8_t), Event* out_event) {
-  if (len == 2 && (line[0] == 's' || line[0] == 'S') && line[1] >= '0' && line[1] <= '4') {
-    set_runtime_mode_fn((uint8_t)(line[1] - '0'));
+  if (len >= 2 && (line[0] == 's' || line[0] == 'S')) {
+    int32_t mode_mask = 0;
+    if (parse_int(line + 1, mode_mask) && mode_mask >= 0 && mode_mask <= 15) {
+      set_runtime_mode_fn((uint8_t)mode_mask);
+      return false;
+    }
+    Serial.println("MODE_CMD expects s<0..15> (bitmask: 1=IR 2=LED 4=EV 8=SCENE, 0=ALL)");
     return false;
   }
   if (len == 2 && (line[0] == 'm' || line[0] == 'M') && line[1] >= '0' && line[1] <= '3') {

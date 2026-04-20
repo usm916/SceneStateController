@@ -19,6 +19,11 @@ WebOtaBlinkApp app;
 static ConsoleLogger s_log(Serial);
 
 static uint8_t s_runtime_mode = SSC_MODE;
+static constexpr uint8_t MODE_IR = 0x01;
+static constexpr uint8_t MODE_LED = 0x02;
+static constexpr uint8_t MODE_ELEVATOR = 0x04;
+static constexpr uint8_t MODE_SCENE = 0x08;
+static constexpr uint8_t MODE_ALL = MODE_IR | MODE_LED | MODE_ELEVATOR | MODE_SCENE;
 static bool s_ir_ready = false;
 static bool s_led_ready = false;
 static bool s_elevator_ready = false;
@@ -38,6 +43,7 @@ static void apply_led_override(uint8_t pattern_id);
 static bool mode_is(uint8_t mode);
 static void ensure_modules_for_mode(uint8_t mode);
 static void set_runtime_mode(uint8_t mode);
+static uint8_t normalize_runtime_mode(uint8_t mode);
 static uint16_t calc_ramp_up_speed(uint32_t now_ms);
 static uint16_t calc_ramp_down_speed(uint32_t now_ms);
 static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
@@ -59,26 +65,31 @@ static void apply_led_override(uint8_t pattern_id) {
 }
 
 static bool mode_is(uint8_t mode) {
-  return s_runtime_mode == 0 || s_runtime_mode == mode;
+  return (s_runtime_mode & mode) != 0;
+}
+
+static uint8_t normalize_runtime_mode(uint8_t mode) {
+  const uint8_t masked = mode & MODE_ALL;
+  return (masked == 0) ? MODE_ALL : masked;
 }
 
 static void ensure_modules_for_mode(uint8_t mode) {
-  if ((mode == 0 || mode == 1) && !s_ir_ready) {
+  if ((mode & MODE_IR) != 0 && !s_ir_ready) {
     Serial.println("Setting up IR...");
     ir_setup();
     s_ir_ready = true;
   }
-  if ((mode == 0 || mode == 2) && !s_led_ready) {
+  if ((mode & MODE_LED) != 0 && !s_led_ready) {
     Serial.println("Setting up LED...");
     led_setup();
     s_led_ready = true;
   }
-  if ((mode == 0 || mode == 3) && !s_elevator_ready) {
+  if ((mode & MODE_ELEVATOR) != 0 && !s_elevator_ready) {
     Serial.println("Setting up elevator...");
     elevator_setup();
     s_elevator_ready = true;
   }
-  if (mode == 0 && !s_scene_ready) {
+  if ((mode & MODE_SCENE) != 0 && !s_scene_ready) {
     Serial.println("Setting up scene...");
     scene_setup();
     s_scene_ready = true;
@@ -88,11 +99,13 @@ static void ensure_modules_for_mode(uint8_t mode) {
 }
 
 static void set_runtime_mode(uint8_t mode) {
-  if (mode > 4) return;
+  const uint8_t next_mode = normalize_runtime_mode(mode);
   const uint8_t prev_mode = s_runtime_mode;
-  s_runtime_mode = mode;
-  ensure_modules_for_mode(mode);
-  if (mode == 0) scene_setup();
+  s_runtime_mode = next_mode;
+  ensure_modules_for_mode(next_mode);
+  if (((prev_mode & MODE_SCENE) == 0) && (next_mode & MODE_SCENE) != 0) {
+    scene_setup();
+  }
   s_log.print_mode_change(prev_mode, s_runtime_mode);
 }
 
@@ -130,7 +143,7 @@ void setup() {
   shared_serial_setup();
   pi_link_setup();
   button_position_store_setup();
-  s_runtime_mode = SSC_MODE;
+  s_runtime_mode = normalize_runtime_mode(SSC_MODE);
   ensure_modules_for_mode(s_runtime_mode);
   led_set_updates_enabled(false);
   s_log.print_startup(s_runtime_mode);
@@ -143,29 +156,29 @@ void loop() {
   shared_serial_pump();
   Event serial_event = {EVT_NONE, 0, {}};
 
-  if (s_runtime_mode == 3) {
+  if (s_runtime_mode == MODE_ELEVATOR) {
     handleSerialInput();
   } else if (serial_console_poll(s_log, set_runtime_mode, &serial_event)) {
-    if (s_runtime_mode == 0) {
+    if (mode_is(MODE_SCENE)) {
       if (serial_event.type == EVT_PI_CMD_LED) apply_led_override(serial_event.data.led.pattern_id);
       scene_handle_event(serial_event);
-    } else if (s_runtime_mode == 2 && serial_event.type == EVT_PI_CMD_LED) {
+    } else if (mode_is(MODE_LED) && serial_event.type == EVT_PI_CMD_LED) {
       apply_led_override(serial_event.data.led.pattern_id);
-    } else if (s_runtime_mode == 3 && serial_event.type == EVT_PI_CMD_MOVE) {
+    } else if (mode_is(MODE_ELEVATOR) && serial_event.type == EVT_PI_CMD_MOVE) {
       elevator_command_move_to(serial_event.data.move.target_floor);
     }
   }
 
-  if (mode_is(1)) {
+  if (mode_is(MODE_IR)) {
     Event e;
     if (ir_poll(e)) {
 #if SSC_IR_LOG_ENABLE
       // s_log.print_ir_event(e);
 #endif
-      if (s_runtime_mode == 1) {
-        pi_link_send_event(e);
-      } else {
+      if (mode_is(MODE_SCENE)) {
         scene_handle_event(e);
+      } else {
+        pi_link_send_event(e);
       }
     }
 
@@ -266,25 +279,25 @@ void loop() {
     }
   }
 
-  if (mode_is(3)) {
+  if (mode_is(MODE_ELEVATOR)) {
     now_ms = millis();
     Event ev_e;
     elevator_tick(now_ms, &ev_e);
     if (ev_e.type != EVT_NONE) {
-      if (s_runtime_mode == 3) {
-        pi_link_send_event(ev_e);
-      } else {
+      if (mode_is(MODE_SCENE)) {
         scene_handle_event(ev_e);
+      } else {
+        pi_link_send_event(ev_e);
       }
     }
   }
 
-  if (mode_is(2)) {
+  if (mode_is(MODE_LED)) {
     now_ms = millis();
     led_tick(now_ms);
   }
 
-  if (s_runtime_mode == 0) {
+  if (mode_is(MODE_SCENE)) {
     now_ms = millis();
     scene_tick(now_ms);
   }
