@@ -153,7 +153,12 @@ void setup() {
   shared_serial_setup();
   pi_link_setup();
   button_position_store_setup();
-  s_runtime_mode = normalize_runtime_mode(SSC_MODE);
+  uint8_t startup_mode = normalize_runtime_mode(SSC_MODE);
+  uint8_t saved_mode = 0;
+  if (app.getSavedRuntimeMode(&saved_mode)) {
+    startup_mode = normalize_runtime_mode(saved_mode);
+  }
+  s_runtime_mode = startup_mode;
   ensure_modules_for_mode(s_runtime_mode);
   led_set_updates_enabled(false);
   s_log.print_startup(s_runtime_mode);

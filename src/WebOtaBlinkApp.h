@@ -11,6 +11,7 @@ class WebOtaBlinkApp
 public:
   void begin();
   void loop();
+  bool getSavedRuntimeMode(uint8_t* out_mode) const;
 
 private:
   static constexpr int kMaxWifiSlots = 3;
@@ -39,9 +40,12 @@ private:
   bool webPrevToggleOn_ = false;
   bool webNextToggleOn_ = false;
   unsigned long nextWebToggleInjectAtMs_ = 0;
+  bool hasSavedRuntimeMode_ = false;
+  uint8_t savedRuntimeMode_ = 0;
 
   void loadSettings();
   void saveSettings();
+  void saveRuntimeModeSetting(uint8_t mode);
   void setDefaultSettings();
 
   bool connectToSavedWifiList();
