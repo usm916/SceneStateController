@@ -26,6 +26,7 @@ static constexpr const char* kRuntimeModeKey = "runtime_mode";
 static constexpr const char* kEspnowRoleKey = "esp_role";
 static constexpr const char* kEspnowChannelKey = "esp_channel";
 static constexpr const char* kEspnowPeerMacKey = "esp_peer_mac";
+static constexpr const char* kSelfStaMacKey = "self_sta_mac";
 
 // ------------------------------------------------------------
 // public
@@ -140,6 +141,11 @@ void WebOtaBlinkApp::loadSettings()
 
   espnowConfig_.role = prefs_.getUChar(kEspnowRoleKey, ESPNOW_LINK_ROLE_OFF);
   espnowConfig_.channel = prefs_.getUChar(kEspnowChannelKey, SSC_ESPNOW_LINK_CHANNEL);
+  const String selfMacText = prefs_.getString(kSelfStaMacKey, "");
+  if (parseMacText(selfMacText, customStaMac_))
+  {
+    customStaMac_[0] = (customStaMac_[0] | 0x02) & 0xFE;
+  }
   const String peerMacText = prefs_.getString(kEspnowPeerMacKey, "");
   if (!parseMacText(peerMacText, espnowConfig_.peer_mac)) {
     const uint8_t defaultPeerMac[6] = SSC_ESPNOW_LINK_PEER_MAC;
@@ -179,6 +185,7 @@ void WebOtaBlinkApp::saveSettings()
 
   prefs_.putUChar(kEspnowRoleKey, espnowConfig_.role);
   prefs_.putUChar(kEspnowChannelKey, espnowConfig_.channel);
+  prefs_.putString(kSelfStaMacKey, customMacText());
   prefs_.putString(kEspnowPeerMacKey, espnowPeerMacText());
 
   prefs_.end();
@@ -397,6 +404,25 @@ void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
       espChannel >= 0 && espChannel <= 14)
   {
     espnowConfig_.channel = (uint8_t)espChannel;
+  }
+
+  uint8_t updatedSelfMac[6] = {0};
+  bool hasAllSelfMacOctets = true;
+  for (int i = 0; i < 6; ++i)
+  {
+    int32_t octet = 0;
+    const String key = "self_mac_" + String(i);
+    if (!parseIntParam(request, key, &octet) || octet < 0 || octet > 255)
+    {
+      hasAllSelfMacOctets = false;
+      break;
+    }
+    updatedSelfMac[i] = (uint8_t)octet;
+  }
+  if (hasAllSelfMacOctets)
+  {
+    updatedSelfMac[0] = (updatedSelfMac[0] | 0x02) & 0xFE;
+    memcpy(customStaMac_, updatedSelfMac, sizeof(customStaMac_));
   }
 
   const AsyncWebParameter* peerMacParam = request->getParam("espnow_peer_mac", true);
@@ -1218,6 +1244,17 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div>Current Wi-Fi channel</div><div class='mono'>";
   html += String(WiFi.channel());
   html += "</div>";
+  html += "</div>";
+  html += "<label>Self STA MAC (0-255 x 6, locally administered)</label>";
+  html += "<div style='display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;'>";
+  for (int i = 0; i < 6; ++i)
+  {
+    html += "<input name='self_mac_";
+    html += String(i);
+    html += "' type='number' min='0' max='255' value='";
+    html += String(customStaMac_[i]);
+    html += "'>";
+  }
   html += "</div>";
   html += "<label>Role</label>";
   html += "<select name='espnow_role'>";
