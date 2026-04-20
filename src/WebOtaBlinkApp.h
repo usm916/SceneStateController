@@ -83,4 +83,5 @@ private:
   bool parseIntParam(AsyncWebServerRequest* request, const String& key, int32_t* out_value) const;
   bool parseSceneParam(const String& key, SceneId* out_scene) const;
   bool parseRemoteButtonParam(const String& key, uint8_t* out_button_code) const;
+  void sendEspnowWebEcho(AsyncWebServerRequest* request, const String& payload) const;
 };

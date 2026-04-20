@@ -569,6 +569,19 @@ void WebOtaBlinkApp::handlePressButton(AsyncWebServerRequest* request)
   request->send(200, "text/plain; charset=utf-8", String("Sent: ") + btnParam->value());
 }
 
+
+void WebOtaBlinkApp::sendEspnowWebEcho(AsyncWebServerRequest* request, const String& payload) const
+{
+  if (request == nullptr)
+  {
+    return;
+  }
+
+  const String echo = String("devLED::") + payload;
+  Serial.println(echo);
+  request->send(200, "text/plain; charset=utf-8", echo);
+}
+
 void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
 {
   if (request == nullptr) return;
@@ -580,6 +593,8 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
       led_set_updates_enabled(enabled);
       if (espnow_link_is_manager()) {
         (void)espnow_link_send_updates_enabled(enabled);
+        sendEspnowWebEcho(request, String("update_enabled=") + (enabled ? "1" : "0"));
+        return;
       }
       request->send(200, "text/plain; charset=utf-8",
                     led_updates_enabled() ? "led updates enabled" : "led updates disabled");
@@ -595,6 +610,8 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
         led_set_global_brightness_pct((uint8_t)brightnessPct)) {
       if (espnow_link_is_manager()) {
         (void)espnow_link_send_brightness_pct((uint8_t)brightnessPct);
+        sendEspnowWebEcho(request, String("brightness_pct=") + String(brightnessPct));
+        return;
       }
       request->send(200, "text/plain; charset=utf-8", "brightness updated");
       return;
@@ -609,6 +626,8 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
       led_set_pattern((LedPattern)pattern);
       if (espnow_link_is_manager()) {
         (void)espnow_link_send_pattern((LedPattern)pattern);
+        sendEspnowWebEcho(request, String("pattern=") + String(pattern));
+        return;
       }
       request->send(200, "text/plain; charset=utf-8", "pattern updated");
       return;
@@ -683,6 +702,8 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
     }
     if (espnow_link_is_manager()) {
       (void)espnow_link_send_all_scene(scene);
+      sendEspnowWebEcho(request, String("strip=ALL,scene=") + value);
+      return;
     }
     request->send(200, "text/plain; charset=utf-8", "all strips scene updated");
     return;
@@ -691,6 +712,8 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
   led_set_strip_scene((uint8_t)stripIndex, scene);
   if (espnow_link_is_manager()) {
     (void)espnow_link_send_strip_scene((uint8_t)stripIndex, scene);
+    sendEspnowWebEcho(request, String("strip=") + String(stripIndex) + ",scene=" + value);
+    return;
   }
   request->send(200, "text/plain; charset=utf-8", "strip scene updated");
 }
