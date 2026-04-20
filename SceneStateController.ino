@@ -19,8 +19,13 @@
 WebOtaBlinkApp app;
 
 static ConsoleLogger s_log(Serial);
+static TaskHandle_t s_led_task_handle = nullptr;
+static bool s_led_task_running = false;
+static int s_loop_core_id = -1;
+static int s_led_task_core_id = -1;
+static uint8_t s_scheduler_core_count = 1;
 
-static uint8_t s_runtime_mode = SSC_MODE;
+static volatile uint8_t s_runtime_mode = SSC_MODE;
 static constexpr uint8_t MODE_IR = RUNTIME_MODE_IR;
 static constexpr uint8_t MODE_LED = RUNTIME_MODE_LED;
 static constexpr uint8_t MODE_ELEVATOR = RUNTIME_MODE_ELEVATOR;
@@ -50,10 +55,22 @@ static uint16_t calc_ramp_up_speed(uint32_t now_ms);
 static uint16_t calc_ramp_down_speed(uint32_t now_ms);
 static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
 static uint16_t manual_spin_speed_cap();
+static uint8_t freertos_core_count();
+static void led_task_loop(void* arg);
 
 static uint16_t manual_spin_speed_cap() {
   const float move_speed_f = elevator_move_max_speed();
   return (move_speed_f > 0.0f) ? (uint16_t)move_speed_f : 1;
+}
+
+static uint8_t freertos_core_count() {
+#if defined(configNUMBER_OF_CORES)
+  return (uint8_t)configNUMBER_OF_CORES;
+#elif defined(portNUM_PROCESSORS)
+  return (uint8_t)portNUM_PROCESSORS;
+#else
+  return (uint8_t)ESP.getChipCores();
+#endif
 }
 
 static void apply_led_override(uint8_t pattern_id) {
@@ -119,6 +136,26 @@ void runtime_mode_set(uint8_t mode) {
   set_runtime_mode(mode);
 }
 
+int runtime_loop_core_id() {
+  return s_loop_core_id;
+}
+
+int runtime_led_task_core_id() {
+  return s_led_task_core_id;
+}
+
+bool runtime_led_task_running() {
+  return s_led_task_running;
+}
+
+uint8_t runtime_chip_core_count() {
+  return (uint8_t)ESP.getChipCores();
+}
+
+uint8_t runtime_scheduler_core_count() {
+  return s_scheduler_core_count;
+}
+
 static uint16_t calc_ramp_up_speed(uint32_t now_ms) {
   const uint32_t elapsed = now_ms - s_manual_spin_press_start_ms;
   const uint16_t max_speed = manual_spin_speed_cap();
@@ -159,6 +196,33 @@ void setup() {
   s_log.print_startup(s_runtime_mode);
   Serial.print("FastLED RMT status: ");
   Serial.println(led_rmt_status_text());
+
+  s_loop_core_id = xPortGetCoreID();
+  s_scheduler_core_count = freertos_core_count();
+  Serial.printf("loop core=%d\n", s_loop_core_id);
+  Serial.printf("chip cores=%d, freertos cores=%u\n", ESP.getChipCores(), s_scheduler_core_count);
+
+  if (s_scheduler_core_count > 1) {
+    s_led_task_core_id = (s_loop_core_id == 0) ? 1 : 0;
+    BaseType_t task_ok = xTaskCreatePinnedToCore(
+        led_task_loop,
+        "led_task",
+        4096,
+        nullptr,
+        1,
+        &s_led_task_handle,
+        s_led_task_core_id);
+    if (task_ok == pdPASS) {
+      s_led_task_running = true;
+      Serial.printf("led task core=%d\n", s_led_task_core_id);
+    } else {
+      s_led_task_core_id = s_loop_core_id;
+      Serial.println("led task create failed. fallback to loop.");
+    }
+  } else {
+    s_led_task_core_id = s_loop_core_id;
+    Serial.println("single-core scheduler mode. led task stays on loop core.");
+  }
 }
 
 void loop() {
@@ -305,7 +369,7 @@ void loop() {
     }
   }
 
-  if (mode_is(MODE_LED)) {
+  if (!s_led_task_running && mode_is(MODE_LED)) {
     now_ms = millis();
     led_tick(now_ms);
   }
@@ -313,5 +377,21 @@ void loop() {
   if (mode_is(MODE_SCENE)) {
     now_ms = millis();
     scene_tick(now_ms);
+  }
+}
+
+static void led_task_loop(void* arg) {
+  (void)arg;
+  bool core_logged = false;
+  for (;;) {
+    if (!core_logged) {
+      Serial.printf("led task running on core=%d\n", xPortGetCoreID());
+      core_logged = true;
+    }
+    if (mode_is(MODE_LED)) {
+      const uint32_t now_ms = millis();
+      led_tick(now_ms);
+    }
+    vTaskDelay(pdMS_TO_TICKS(1));
   }
 }

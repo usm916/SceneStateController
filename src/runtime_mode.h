@@ -11,3 +11,8 @@ static constexpr uint8_t RUNTIME_MODE_ALL =
 
 uint8_t runtime_mode_get();
 void runtime_mode_set(uint8_t mode);
+int runtime_loop_core_id();
+int runtime_led_task_core_id();
+bool runtime_led_task_running();
+uint8_t runtime_chip_core_count();
+uint8_t runtime_scheduler_core_count();
