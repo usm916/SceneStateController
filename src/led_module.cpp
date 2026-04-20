@@ -381,3 +381,17 @@ void led_tick(uint32_t now_ms) {
 
   FastLED.show();
 }
+
+const char* led_rmt_status_text() {
+#if defined(FASTLED_RMT5)
+  return (FASTLED_RMT5 != 0) ? "enabled (RMT5)" : "disabled (FASTLED_RMT5=0)";
+#elif defined(FASTLED_RMT_BUILTIN_DRIVER)
+  return (FASTLED_RMT_BUILTIN_DRIVER != 0) ? "enabled (RMT4)" : "disabled (FASTLED_RMT_BUILTIN_DRIVER=0)";
+#elif defined(FASTLED_ESP32_I2S)
+  return (FASTLED_ESP32_I2S != 0) ? "disabled (I2S backend)" : "disabled (FASTLED_ESP32_I2S=0)";
+#elif defined(ARDUINO_ARCH_ESP32)
+  return "auto (ESP32 backend selected by FastLED)";
+#else
+  return "n/a (non-ESP32 build)";
+#endif
+}
