@@ -1108,6 +1108,21 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div>FastLED RMT status</div><div>";
   html += htmlEscape(String(led_rmt_status_text()));
   html += "</div>";
+  html += "<div>CPU cores</div><div>";
+  html += String((int)runtime_chip_core_count());
+  html += " (scheduler: ";
+  html += String((int)runtime_scheduler_core_count());
+  html += ")</div>";
+  html += "<div>Loop core</div><div>";
+  html += String(runtime_loop_core_id());
+  html += "</div>";
+  html += "<div>LED task core</div><div>";
+  if (runtime_led_task_running()) {
+    html += String(runtime_led_task_core_id());
+  } else {
+    html += "loop fallback";
+  }
+  html += "</div>";
   html += "<div>LED update loop</div><div>";
   html += "<button id='led-update-toggle' type='button' onclick='toggleLedUpdates()'>-</button>";
   html += "</div>";
