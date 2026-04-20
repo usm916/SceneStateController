@@ -41,9 +41,9 @@ void ConsoleLogger::print_serial_echo(char c) {
 
 void ConsoleLogger::print_mode_usage() {
   out_.println("Type help to show this command list.");
-  out_.println("MODE_CMD usage: s0..s4");
+  out_.println("MODE_CMD usage: s<0..15>  (bitmask 1=IR 2=LED 4=EV 8=SCENE, s0=ALL)");
   out_.println("IR decode mode: m0..m3");
-  out_.println("Elevator target (mode 3): e<steps>  (example: e3200)");
+  out_.println("Elevator target (when EV enabled): e<steps>  (example: e3200)");
   out_.println("TMC usage: TMC RUN <mA> | TMC HOLD <0..100> | TMC INFO");
   out_.println("System info: INFO");
   out_.println("Preset cmds: mute | rec_<btn> | rec_<btn>_<steps> | save_pref");
@@ -62,9 +62,9 @@ void ConsoleLogger::print_mode_cmd_too_long() {
 void ConsoleLogger::print_startup(uint8_t mode) {
   out_.print("INITIAL MODE=");
   out_.println(mode);
-  out_.println("Type s0..s4 + Enter to switch mode at runtime.");
+  out_.println("Type s<0..15> + Enter to switch runtime flags (1=IR 2=LED 4=EV 8=SCENE, s0=ALL).");
   out_.println("Type m0..m3 + Enter to switch IR decode mode.");
-  out_.println("In mode 3, type e<steps> + Enter to move elevator.");
+  out_.println("When EV is enabled, type e<steps> + Enter to move elevator.");
   out_.println("READY");
 }
 
