@@ -19,9 +19,13 @@ static const char kControllerSettingsSectionTemplate[] =
 #include "scene_controller.h"
 #include "tmc2209_module.h"
 #include "runtime_mode.h"
+#include "espnow_link.h"
 
 static constexpr const char* kPrefsNamespace = "app";
 static constexpr const char* kRuntimeModeKey = "runtime_mode";
+static constexpr const char* kEspnowRoleKey = "esp_role";
+static constexpr const char* kEspnowChannelKey = "esp_channel";
+static constexpr const char* kEspnowPeerMacKey = "esp_peer_mac";
 
 // ------------------------------------------------------------
 // public
@@ -34,6 +38,7 @@ void WebOtaBlinkApp::begin()
   Serial.println("Booting...");
 
   loadSettings();
+  espnow_link_set_config(espnowConfig_);
 
   if (!connectToSavedWifiList())
   {
@@ -133,6 +138,14 @@ void WebOtaBlinkApp::loadSettings()
     pass.toCharArray(wifiSlots_[i].pass, sizeof(wifiSlots_[i].pass));
   }
 
+  espnowConfig_.role = prefs_.getUChar(kEspnowRoleKey, ESPNOW_LINK_ROLE_OFF);
+  espnowConfig_.channel = prefs_.getUChar(kEspnowChannelKey, SSC_ESPNOW_LINK_CHANNEL);
+  const String peerMacText = prefs_.getString(kEspnowPeerMacKey, "");
+  if (!parseMacText(peerMacText, espnowConfig_.peer_mac)) {
+    const uint8_t defaultPeerMac[6] = SSC_ESPNOW_LINK_PEER_MAC;
+    memcpy(espnowConfig_.peer_mac, defaultPeerMac, sizeof(espnowConfig_.peer_mac));
+  }
+
   prefs_.end();
 
   bool allEmpty = true;
@@ -163,6 +176,10 @@ void WebOtaBlinkApp::saveSettings()
     prefs_.putString(ssidKey.c_str(), wifiSlots_[i].ssid);
     prefs_.putString(passKey.c_str(), wifiSlots_[i].pass);
   }
+
+  prefs_.putUChar(kEspnowRoleKey, espnowConfig_.role);
+  prefs_.putUChar(kEspnowChannelKey, espnowConfig_.channel);
+  prefs_.putString(kEspnowPeerMacKey, espnowPeerMacText());
 
   prefs_.end();
 }
@@ -348,6 +365,8 @@ void WebOtaBlinkApp::handleRoot(AsyncWebServerRequest* request)
 
 void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
 {
+  if (request == nullptr) return;
+
   for (int i = 0; i < kMaxWifiSlots; ++i)
   {
     const String ssidKey = "ssid" + String(i);
@@ -366,6 +385,30 @@ void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
     pass.toCharArray(wifiSlots_[i].pass, sizeof(wifiSlots_[i].pass));
   }
 
+  int32_t espRole = 0;
+  if (parseIntParam(request, "espnow_role", &espRole) &&
+      espRole >= ESPNOW_LINK_ROLE_OFF && espRole <= ESPNOW_LINK_ROLE_LED_NODE)
+  {
+    espnowConfig_.role = (uint8_t)espRole;
+  }
+
+  int32_t espChannel = 0;
+  if (parseIntParam(request, "espnow_channel", &espChannel) &&
+      espChannel >= 0 && espChannel <= 14)
+  {
+    espnowConfig_.channel = (uint8_t)espChannel;
+  }
+
+  const AsyncWebParameter* peerMacParam = request->getParam("espnow_peer_mac", true);
+  if (peerMacParam != nullptr)
+  {
+    uint8_t peerMac[6] = {0};
+    if (parseMacText(peerMacParam->value(), peerMac))
+    {
+      memcpy(espnowConfig_.peer_mac, peerMac, sizeof(espnowConfig_.peer_mac));
+    }
+  }
+
   saveSettings();
 
   String html;
@@ -373,7 +416,7 @@ void WebOtaBlinkApp::handleSaveWifi(AsyncWebServerRequest* request)
   html += "<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>";
   html += "<title>Saved</title></head><body style='font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;'>";
   html += "<h1>Wi-Fi settings saved</h1>";
-  html += "<p>Device will reboot and retry the Wi-Fi list.</p>";
+  html += "<p>Device will reboot and apply Wi-Fi / ESP-NOW settings.</p>";
   html += "</body></html>";
 
   request->send(200, "text/html; charset=utf-8", html);
@@ -507,7 +550,11 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
   int32_t updateEnabled = -1;
   if (parseIntParam(request, "update_enabled", &updateEnabled)) {
     if (updateEnabled == 0 || updateEnabled == 1) {
-      led_set_updates_enabled(updateEnabled == 1);
+      const bool enabled = (updateEnabled == 1);
+      led_set_updates_enabled(enabled);
+      if (espnow_link_is_manager()) {
+        (void)espnow_link_send_updates_enabled(enabled);
+      }
       request->send(200, "text/plain; charset=utf-8",
                     led_updates_enabled() ? "led updates enabled" : "led updates disabled");
       return;
@@ -520,6 +567,9 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
   if (parseIntParam(request, "brightness_pct", &brightnessPct)) {
     if (brightnessPct >= 0 && brightnessPct <= 100 &&
         led_set_global_brightness_pct((uint8_t)brightnessPct)) {
+      if (espnow_link_is_manager()) {
+        (void)espnow_link_send_brightness_pct((uint8_t)brightnessPct);
+      }
       request->send(200, "text/plain; charset=utf-8", "brightness updated");
       return;
     }
@@ -531,6 +581,9 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
   if (parseIntParam(request, "pattern", &pattern)) {
     if (pattern >= 0 && pattern <= 3) {
       led_set_pattern((LedPattern)pattern);
+      if (espnow_link_is_manager()) {
+        (void)espnow_link_send_pattern((LedPattern)pattern);
+      }
       request->send(200, "text/plain; charset=utf-8", "pattern updated");
       return;
     }
@@ -602,11 +655,17 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
     for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
       led_set_strip_scene(strip, scene);
     }
+    if (espnow_link_is_manager()) {
+      (void)espnow_link_send_all_scene(scene);
+    }
     request->send(200, "text/plain; charset=utf-8", "all strips scene updated");
     return;
   }
 
   led_set_strip_scene((uint8_t)stripIndex, scene);
+  if (espnow_link_is_manager()) {
+    (void)espnow_link_send_strip_scene((uint8_t)stripIndex, scene);
+  }
   request->send(200, "text/plain; charset=utf-8", "strip scene updated");
 }
 
@@ -838,6 +897,29 @@ String WebOtaBlinkApp::customMacText() const
            customStaMac_[0], customStaMac_[1], customStaMac_[2],
            customStaMac_[3], customStaMac_[4], customStaMac_[5]);
   return String(buf);
+}
+
+String WebOtaBlinkApp::espnowPeerMacText() const
+{
+  char buf[18];
+  snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+           espnowConfig_.peer_mac[0], espnowConfig_.peer_mac[1], espnowConfig_.peer_mac[2],
+           espnowConfig_.peer_mac[3], espnowConfig_.peer_mac[4], espnowConfig_.peer_mac[5]);
+  return String(buf);
+}
+
+bool WebOtaBlinkApp::parseMacText(const String& text, uint8_t out_mac[6])
+{
+  if (out_mac == nullptr) return false;
+  unsigned int b[6] = {0};
+  const int matched = sscanf(text.c_str(), "%2x:%2x:%2x:%2x:%2x:%2x",
+                             &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]);
+  if (matched != 6) return false;
+  for (int i = 0; i < 6; ++i)
+  {
+    out_mac[i] = (uint8_t)b[i];
+  }
+  return true;
 }
 
 bool WebOtaBlinkApp::parseIntParam(AsyncWebServerRequest* request, const String& key, int32_t* out_value) const
@@ -1128,7 +1210,37 @@ String WebOtaBlinkApp::makeHtml() const
     html += "'>";
   }
 
-  html += "<p class='small'>保存後に再起動し、各SSIDを3回ずつ順番に試します。DHCPで接続します。</p>";
+  html += "<h3>ESP-NOW Link</h3>";
+  html += "<div class='grid'>";
+  html += "<div>Self STA MAC</div><div class='mono'>";
+  html += customMacText();
+  html += "</div>";
+  html += "<div>Current Wi-Fi channel</div><div class='mono'>";
+  html += String(WiFi.channel());
+  html += "</div>";
+  html += "</div>";
+  html += "<label>Role</label>";
+  html += "<select name='espnow_role'>";
+  html += "<option value='0'";
+  if (espnowConfig_.role == ESPNOW_LINK_ROLE_OFF) html += " selected";
+  html += ">OFF</option>";
+  html += "<option value='1'";
+  if (espnowConfig_.role == ESPNOW_LINK_ROLE_MANAGER) html += " selected";
+  html += ">MANAGER (IR/EV/Web)</option>";
+  html += "<option value='2'";
+  if (espnowConfig_.role == ESPNOW_LINK_ROLE_LED_NODE) html += " selected";
+  html += ">LED NODE</option>";
+  html += "</select>";
+  html += "<label>ESP-NOW channel (0 = current channel)</label>";
+  html += "<input name='espnow_channel' type='number' min='0' max='14' value='";
+  html += String(espnowConfig_.channel);
+  html += "'>";
+  html += "<label>Peer STA MAC (AA:BB:CC:DD:EE:FF)</label>";
+  html += "<input name='espnow_peer_mac' value='";
+  html += htmlEscape(espnowPeerMacText());
+  html += "'>";
+
+  html += "<p class='small'>保存後に再起動し、各SSIDを3回ずつ順番に試します。ESP-NOW role/peer/channel も同時に適用します。</p>";
   html += "<button type='submit'>Save Wi-Fi Settings</button>";
   html += "</form></div>";
 
@@ -1266,12 +1378,15 @@ String WebOtaBlinkApp::makeHtml() const
   html += "function updateRuntimeUi(mask){runtimeModeMask=mask;const ids=[[1,'runtime-ir'],[2,'runtime-led'],[4,'runtime-elevator'],[8,'runtime-scene']];for(const e of ids){const btn=document.getElementById(e[1]);if(btn)btn.classList.toggle('toggle-on',(mask&e[0])!==0);}setRuntimeStatus('Runtime mode: '+modeLabel(mask),false);}";
   html += "async function toggleRuntimeFlag(flag){try{const r=await postForm('/runtime-mode',{flag:String(flag)});const t=await r.text();if(!r.ok){setRuntimeStatus('Mode update failed: '+t,true);return;}const mask=parseInt(t,10);if(Number.isNaN(mask)){setRuntimeStatus('Mode response invalid: '+t,true);return;}updateRuntimeUi(mask);}catch(e){setRuntimeStatus('Mode update failed: '+e,true);}}";
   html += "async function setRuntimeAll(){try{const r=await postForm('/runtime-mode',{all:'1'});const t=await r.text();if(!r.ok){setRuntimeStatus('ALL failed: '+t,true);return;}const mask=parseInt(t,10);if(Number.isNaN(mask)){setRuntimeStatus('ALL response invalid: '+t,true);return;}updateRuntimeUi(mask);}catch(e){setRuntimeStatus('ALL failed: '+e,true);}}";
-  html += "let ledBrightnessApplyTimer=0;";
-  html += "let ledBrightnessReqSeq=0;";
-  html += "let ledBrightnessAckSeq=0;";
-  html += "async function applyRealtimeBrightness(v){const seq=++ledBrightnessReqSeq;try{const r=await postForm('/led-control',{brightness_pct:String(v)});const t=await r.text();if(seq<ledBrightnessAckSeq)return;ledBrightnessAckSeq=seq;setLedStatus((r.ok?('Brightness: '+v+'%'):('Brightness failed: '+t)),!r.ok);}catch(e){if(seq<ledBrightnessAckSeq)return;ledBrightnessAckSeq=seq;setLedStatus('Brightness failed: '+e,true);}}";
-  html += "function queueRealtimeBrightness(v){if(ledBrightnessApplyTimer)clearTimeout(ledBrightnessApplyTimer);ledBrightnessApplyTimer=setTimeout(()=>applyRealtimeBrightness(v),80);}";
-  html += "function initBrightnessControl(){const num=document.getElementById('led-brightness-input');const slider=document.getElementById('led-brightness-slider');if(!num||!slider)return;const clamp=(raw)=>{const n=parseInt(raw,10);if(Number.isNaN(n))return 0;return Math.max(0,Math.min(100,n));};const syncFrom=(src,dst)=>{const v=clamp(src.value);src.value=String(v);dst.value=String(v);queueRealtimeBrightness(v);};num.addEventListener('input',()=>syncFrom(num,slider));slider.addEventListener('input',()=>syncFrom(slider,num));}";
+  html += "let ledBrightnessInFlight=false;";
+  html += "let ledBrightnessDirty=false;";
+  html += "let ledBrightnessPending=";
+  html += String(led_global_brightness_pct());
+  html += ";";
+  html += "let ledBrightnessSent=ledBrightnessPending;";
+  html += "async function flushBrightness(){if(ledBrightnessInFlight||!ledBrightnessDirty)return;const v=ledBrightnessPending;if(v===ledBrightnessSent){ledBrightnessDirty=false;return;}ledBrightnessInFlight=true;ledBrightnessDirty=false;try{const r=await postForm('/led-control',{brightness_pct:String(v)});const t=await r.text();if(r.ok){ledBrightnessSent=v;setLedStatus('Brightness: '+v+'%',false);}else{setLedStatus('Brightness failed: '+t,true);}}catch(e){setLedStatus('Brightness failed: '+e,true);}finally{ledBrightnessInFlight=false;if(ledBrightnessDirty&&ledBrightnessPending!==ledBrightnessSent){flushBrightness();}}}";
+  html += "function queueFinalBrightness(v){ledBrightnessPending=v;ledBrightnessDirty=true;if(!ledBrightnessInFlight){flushBrightness();}}";
+  html += "function initBrightnessControl(){const num=document.getElementById('led-brightness-input');const slider=document.getElementById('led-brightness-slider');if(!num||!slider)return;const clamp=(raw)=>{const n=parseInt(raw,10);if(Number.isNaN(n))return 0;return Math.max(0,Math.min(100,n));};const syncValues=(v)=>{const c=clamp(v);num.value=String(c);slider.value=String(c);return c;};const queueFrom=(src)=>{const v=syncValues(src.value);queueFinalBrightness(v);};num.addEventListener('input',()=>syncValues(num.value));slider.addEventListener('input',()=>syncValues(slider.value));num.addEventListener('change',()=>queueFrom(num));num.addEventListener('blur',()=>queueFrom(num));num.addEventListener('keyup',(e)=>{if(e.key==='Enter')queueFrom(num);});slider.addEventListener('change',()=>queueFrom(slider));slider.addEventListener('mouseup',()=>queueFrom(slider));slider.addEventListener('touchend',()=>queueFrom(slider));slider.addEventListener('keyup',(e)=>{if(e.key==='Enter')queueFrom(slider);});}";
   html += "syncToggleUi('";
   if (webPrevToggleOn_)
   {

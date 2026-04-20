@@ -5,6 +5,7 @@
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
 #include "scene_state.h"
+#include "espnow_link.h"
 
 class WebOtaBlinkApp
 {
@@ -42,6 +43,7 @@ private:
   unsigned long nextWebToggleInjectAtMs_ = 0;
   bool hasSavedRuntimeMode_ = false;
   uint8_t savedRuntimeMode_ = 0;
+  EspnowLinkConfig espnowConfig_{};
 
   void loadSettings();
   void saveSettings();
@@ -76,6 +78,8 @@ private:
   String currentModeText() const;
   String currentIpText() const;
   String customMacText() const;
+  String espnowPeerMacText() const;
+  static bool parseMacText(const String& text, uint8_t out_mac[6]);
   bool parseIntParam(AsyncWebServerRequest* request, const String& key, int32_t* out_value) const;
   bool parseSceneParam(const String& key, SceneId* out_scene) const;
   bool parseRemoteButtonParam(const String& key, uint8_t* out_button_code) const;
