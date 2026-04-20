@@ -5,6 +5,7 @@
 #include "src/WebOtaBlinkApp.h"
 
 #include "src/elevator_module.h"
+#include "src/frame_timing_stats.h"
 #include "src/ir_module.h"
 #include "src/led_module.h"
 #include "src/pi_link.h"
@@ -162,6 +163,7 @@ void loop() {
   app.loop();
 
   uint32_t now_ms = millis();
+  frame_timing_on_loop(now_ms);
   shared_serial_pump();
   Event serial_event = {EVT_NONE, 0, {}};
 

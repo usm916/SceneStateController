@@ -11,6 +11,7 @@ static const char kControllerSettingsSectionTemplate[] =
 #include <string.h>
 
 #include "button_position_store.h"
+#include "frame_timing_stats.h"
 #include "config.h"
 #include "elevator_module.h"
 #include "ir_module.h"
@@ -1042,6 +1043,16 @@ String WebOtaBlinkApp::makeHtml() const
 
   html += "<div>STA MAC</div><div class='mono'>";
   html += customMacText();
+  html += "</div>";
+
+  html += "<div>Loop frame min (ms)</div><div class='mono'>";
+  html += String(frame_timing_min_ms());
+  html += "</div>";
+  html += "<div>Loop frame max (ms)</div><div class='mono'>";
+  html += String(frame_timing_max_ms());
+  html += "</div>";
+  html += "<div>Loop frame avg10 (ms)</div><div class='mono'>";
+  html += String(frame_timing_avg_last_10_ms());
   html += "</div>";
   html += "</div></div>";
 
