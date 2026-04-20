@@ -9,6 +9,7 @@
 #include "shared_serial.h"
 #include "tmc2209_module.h"
 #include "button_position_store.h"
+#include "espnow_link.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -222,6 +223,9 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
         for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
           led_set_strip_scene(strip, scene);
         }
+        if (espnow_link_is_manager()) {
+          (void)espnow_link_send_all_scene(scene);
+        }
         Serial.println("LEDSCENE ALL updated");
         return false;
       }
@@ -229,6 +233,9 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       int32_t stripIndex = 0;
       if (parse_int(scope, stripIndex) && stripIndex >= 0 && stripIndex < SSC_LED_STRIP_COUNT) {
         led_set_strip_scene((uint8_t)stripIndex, scene);
+        if (espnow_link_is_manager()) {
+          (void)espnow_link_send_strip_scene((uint8_t)stripIndex, scene);
+        }
         Serial.print("LEDSCENE strip=");
         Serial.print(stripIndex);
         Serial.println(" updated");
@@ -257,6 +264,9 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     int32_t brightness_pct = 0;
     if (parse_int(line + 11, brightness_pct) && brightness_pct >= 0 && brightness_pct <= 100) {
       led_set_global_brightness_pct((uint8_t)brightness_pct);
+      if (espnow_link_is_manager()) {
+        (void)espnow_link_send_brightness_pct((uint8_t)brightness_pct);
+      }
       Serial.print("brightness=");
       Serial.println(led_global_brightness_pct());
       return false;

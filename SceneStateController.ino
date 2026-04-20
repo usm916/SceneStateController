@@ -6,6 +6,7 @@
 
 #include "src/elevator_module.h"
 #include "src/frame_timing_stats.h"
+#include "src/espnow_link.h"
 #include "src/ir_module.h"
 #include "src/led_module.h"
 #include "src/pi_link.h"
@@ -153,6 +154,7 @@ void setup() {
   shared_serial_setup();
   pi_link_setup();
   button_position_store_setup();
+  espnow_link_setup();
   uint8_t startup_mode = normalize_runtime_mode(SSC_MODE);
   uint8_t saved_mode = 0;
   if (app.getSavedRuntimeMode(&saved_mode)) {
@@ -172,16 +174,25 @@ void loop() {
   uint32_t now_ms = millis();
   frame_timing_on_loop(now_ms);
   shared_serial_pump();
+  espnow_link_poll();
   Event serial_event = {EVT_NONE, 0, {}};
 
   if (s_runtime_mode == MODE_ELEVATOR) {
     handleSerialInput();
   } else if (serial_console_poll(s_log, set_runtime_mode, &serial_event)) {
     if (mode_is(MODE_SCENE)) {
-      if (serial_event.type == EVT_PI_CMD_LED) apply_led_override(serial_event.data.led.pattern_id);
+      if (serial_event.type == EVT_PI_CMD_LED) {
+        apply_led_override(serial_event.data.led.pattern_id);
+        if (espnow_link_is_manager()) {
+          (void)espnow_link_send_pattern((LedPattern)serial_event.data.led.pattern_id);
+        }
+      }
       scene_handle_event(serial_event);
     } else if (mode_is(MODE_LED) && serial_event.type == EVT_PI_CMD_LED) {
       apply_led_override(serial_event.data.led.pattern_id);
+      if (espnow_link_is_manager()) {
+        (void)espnow_link_send_pattern((LedPattern)serial_event.data.led.pattern_id);
+      }
     } else if (mode_is(MODE_ELEVATOR) && serial_event.type == EVT_PI_CMD_MOVE) {
       elevator_command_move_to(serial_event.data.move.target_floor);
     }
