@@ -3,8 +3,8 @@
 #include "config.h"
 #include "shared_serial.h"
 
-#include <AccelStepper.h>
 #include <Arduino.h>
+#include <FastAccelStepper.h>
 #include <Preferences.h>
 #include <TMCStepper.h>
 
@@ -30,7 +30,8 @@ constexpr uint32_t kCalibVersion = 2;
 
 HardwareSerial& s_tmc_serial = Serial1;
 TMC2209Stepper s_driver(&s_tmc_serial, SSC_TMC_RSENSE_OHM, 0);
-AccelStepper s_stepper(AccelStepper::DRIVER, SSC_PIN_STEP, SSC_PIN_DIR);
+FastAccelStepperEngine s_stepper_engine = FastAccelStepperEngine();
+FastAccelStepper* s_stepper = nullptr;
 Preferences s_prefs;
 
 String s_input_line = "";
@@ -62,6 +63,7 @@ uint32_t s_motor_lag_accumulated_ms = 0;
 uint32_t s_motor_lag_last_warn_ms = 0;
 float s_move_max_speed = kMoveMaxSpeedDefault;
 float s_move_acceleration = kMoveAccelerationDefault;
+int32_t s_stepper_target_position = 0;
 
 struct HomingSession {
   bool active = false;
@@ -78,6 +80,53 @@ struct HomingSession {
 };
 
 HomingSession s_homing;
+
+int32_t stepper_current_position() {
+  return s_stepper ? s_stepper->getCurrentPosition() : 0;
+}
+
+int32_t stepper_target_position() {
+  return s_stepper_target_position;
+}
+
+int32_t stepper_distance_to_go() {
+  return stepper_target_position() - stepper_current_position();
+}
+
+void stepper_set_current_position(int32_t pos_steps) {
+  if (s_stepper) {
+    s_stepper->setCurrentPosition(pos_steps);
+  }
+  s_stepper_target_position = pos_steps;
+}
+
+void stepper_set_max_speed(float speed_steps_per_sec) {
+  if (!s_stepper) return;
+  uint32_t speed_hz = (speed_steps_per_sec <= 1.0f) ? 1u : (uint32_t)speed_steps_per_sec;
+  s_stepper->setSpeedInHz(speed_hz);
+}
+
+void stepper_set_acceleration(float accel_steps_per_sec2) {
+  if (!s_stepper) return;
+  uint32_t accel = (accel_steps_per_sec2 <= 1.0f) ? 1u : (uint32_t)accel_steps_per_sec2;
+  s_stepper->setAcceleration(accel);
+}
+
+void stepper_move_to(int32_t target_steps) {
+  if (!s_stepper) return;
+  s_stepper_target_position = target_steps;
+  s_stepper->moveTo(target_steps);
+}
+
+void stepper_stop() {
+  if (!s_stepper) return;
+  s_stepper->stopMove();
+  s_stepper_target_position = stepper_current_position();
+}
+
+bool stepper_is_running() {
+  return s_stepper ? s_stepper->isRunning() : false;
+}
 
 bool endstop_hit_up_no_pullup() {
   return digitalRead(SSC_PIN_ENDSTOP_UP) == HIGH;
@@ -108,7 +157,7 @@ bool active_homing_switch_hit() {
 }
 
 void zero_at_bottom_endstop() {
-  s_stepper.setCurrentPosition(0);
+  stepper_set_current_position(0);
   s_current_floor = 0;
   s_target_floor = 0;
   s_is_homed_zero = true;
@@ -119,7 +168,7 @@ void begin_spin(int8_t dir, uint16_t speed_steps_per_sec) {
   if (spin_speed <= 0.0f) return;
 
   if (s_spin_mode && s_spin_dir == dir && !s_homing.active) {
-    s_stepper.setMaxSpeed(spin_speed);
+    stepper_set_max_speed(spin_speed);
     return;
   }
 
@@ -129,12 +178,12 @@ void begin_spin(int8_t dir, uint16_t speed_steps_per_sec) {
   s_move_active = true;
   s_homing.active = false;
 
-  s_stepper.setAcceleration(kMoveAccelerationDefault);
-  s_stepper.setMaxSpeed(spin_speed);
+  stepper_set_acceleration(kMoveAccelerationDefault);
+  stepper_set_max_speed(spin_speed);
 
-  const int32_t now_pos = s_stepper.currentPosition();
+  const int32_t now_pos = stepper_current_position();
   const int32_t horizon = (dir > 0) ? kSpinHorizonSteps : -kSpinHorizonSteps;
-  s_stepper.moveTo(now_pos + horizon);
+  stepper_move_to(now_pos + horizon);
 
   s_move_start_ms = millis();
   s_last_check_ms = s_move_start_ms;
@@ -144,11 +193,11 @@ void begin_spin(int8_t dir, uint16_t speed_steps_per_sec) {
 void keep_spin_target_ahead() {
   if (!s_spin_mode || s_spin_dir == 0) return;
 
-  const int32_t dist = s_stepper.distanceToGo();
+  const int32_t dist = stepper_distance_to_go();
   if ((s_spin_dir > 0 && dist < (kSpinHorizonSteps / 2)) ||
       (s_spin_dir < 0 && dist > -(kSpinHorizonSteps / 2))) {
     const int32_t extension = (s_spin_dir > 0) ? kSpinHorizonSteps : -kSpinHorizonSteps;
-    s_stepper.moveTo(s_stepper.targetPosition() + extension);
+    stepper_move_to(stepper_target_position() + extension);
   }
 }
 
@@ -186,8 +235,8 @@ void load_calibration() {
 }
 
 void configure_motion_defaults() {
-  s_stepper.setMaxSpeed(s_move_max_speed);
-  s_stepper.setAcceleration(s_move_acceleration);
+  stepper_set_max_speed(s_move_max_speed);
+  stepper_set_acceleration(s_move_acceleration);
 }
 
 void begin_homing(bool toward_top, bool capture_for_calibration) {
@@ -198,16 +247,16 @@ void begin_homing(bool toward_top, bool capture_for_calibration) {
   s_homing.phase = 1;
   s_homing.dir = toward_top ? 1 : -1;
   s_homing.backoff_dir = -s_homing.dir;
-  s_homing.phase_start_pos = s_stepper.currentPosition();
+  s_homing.phase_start_pos = stepper_current_position();
 
   s_spin_mode = false;
   s_position_mode = false;
   s_spin_dir = 0;
   s_move_active = true;
 
-  s_stepper.setAcceleration(kMoveAccelerationDefault);
-  s_stepper.setMaxSpeed(kHomingFastSpeed);
-  s_stepper.moveTo(s_homing.phase_start_pos + (int32_t)s_homing.dir * kMaxTravelSteps);
+  stepper_set_acceleration(kMoveAccelerationDefault);
+  stepper_set_max_speed(kHomingFastSpeed);
+  stepper_move_to(s_homing.phase_start_pos + (int32_t)s_homing.dir * kMaxTravelSteps);
 
   s_move_start_ms = millis();
   s_last_check_ms = s_move_start_ms;
@@ -222,7 +271,7 @@ void finish_homing_at_margin_reference(uint32_t now_ms, Event* out_event) {
   if (s_homing.toward_top) {
     s_top_margin_steps = s_homing.margin_steps;
     if (s_homing.capture_for_calibration && s_calibration_armed && s_is_homed_zero) {
-      s_top_limit_steps = s_stepper.currentPosition();
+      s_top_limit_steps = stepper_current_position();
       s_has_calibration = save_calibration();
     }
     s_state = EV_IDLE;
@@ -235,7 +284,7 @@ void finish_homing_at_margin_reference(uint32_t now_ms, Event* out_event) {
   s_homing.active = false;
   s_move_active = false;
   configure_motion_defaults();
-  s_stepper.stop();
+  stepper_stop();
 
   if (s_homing.capture_for_calibration && s_homing.toward_top) {
     s_calibration_armed = false;
@@ -252,7 +301,7 @@ void homing_fail(uint32_t now_ms, Event* out_event, int32_t error_code) {
   s_move_active = false;
   s_calibration_armed = false;
   s_state = EV_ERROR;
-  s_stepper.stop();
+  stepper_stop();
   if (out_event) {
     out_event->type = EVT_EV_ERROR;
     out_event->ts_ms = now_ms;
@@ -263,7 +312,7 @@ void homing_fail(uint32_t now_ms, Event* out_event, int32_t error_code) {
 void handle_homing_tick(uint32_t now_ms, Event* out_event) {
   if (!s_homing.active) return;
 
-  const int32_t traveled = abs(s_stepper.currentPosition() - s_homing.phase_start_pos);
+  const int32_t traveled = abs(stepper_current_position() - s_homing.phase_start_pos);
   if ((s_homing.phase == 1 || s_homing.phase == 3) && traveled > kMaxTravelSteps) {
     homing_fail(now_ms, out_event, s_homing.toward_top ? 1101 : 1102);
     return;
@@ -271,18 +320,18 @@ void handle_homing_tick(uint32_t now_ms, Event* out_event) {
 
   if (s_homing.phase == 1) {
     if (active_homing_switch_hit()) {
-      s_homing.hit_pos = s_stepper.currentPosition();
+      s_homing.hit_pos = stepper_current_position();
       s_homing.phase = 2;
       s_homing.phase_start_pos = s_homing.hit_pos;
-      s_stepper.setMaxSpeed(kHomingSlowSpeed);
-      s_stepper.moveTo(s_homing.phase_start_pos + (int32_t)s_homing.backoff_dir * kMaxTravelSteps);
+      stepper_set_max_speed(kHomingSlowSpeed);
+      stepper_move_to(s_homing.phase_start_pos + (int32_t)s_homing.backoff_dir * kMaxTravelSteps);
     }
     return;
   }
 
   if (s_homing.phase == 2) {
     if (!active_homing_switch_hit()) {
-      s_homing.release_pos = s_stepper.currentPosition();
+      s_homing.release_pos = stepper_current_position();
       s_homing.release_steps = abs(s_homing.release_pos - s_homing.hit_pos);
       if (s_homing.release_steps <= 0) s_homing.release_steps = 1;
       s_homing.margin_steps = s_homing.release_steps * 2;
@@ -291,8 +340,8 @@ void handle_homing_tick(uint32_t now_ms, Event* out_event) {
       if (extra_margin_steps > 0) {
         s_homing.phase = 3;
         s_homing.phase_start_pos = s_homing.release_pos;
-        s_stepper.setMaxSpeed(kHomingSlowSpeed);
-        s_stepper.moveTo(s_homing.phase_start_pos + (int32_t)s_homing.backoff_dir * extra_margin_steps);
+        stepper_set_max_speed(kHomingSlowSpeed);
+        stepper_move_to(s_homing.phase_start_pos + (int32_t)s_homing.backoff_dir * extra_margin_steps);
       } else {
         finish_homing_at_margin_reference(now_ms, out_event);
       }
@@ -300,7 +349,7 @@ void handle_homing_tick(uint32_t now_ms, Event* out_event) {
     return;
   }
 
-  if (s_homing.phase == 3 && !s_stepper.isRunning()) {
+  if (s_homing.phase == 3 && !stepper_is_running()) {
     finish_homing_at_margin_reference(now_ms, out_event);
   }
 }
@@ -351,21 +400,16 @@ void monitor_motor_tick_interval(uint32_t now_ms) {
   Serial.print(" state=");
   Serial.print(ev_state_name(s_state));
   Serial.print(" pos=");
-  Serial.print(s_stepper.currentPosition());
+  Serial.print(stepper_current_position());
   Serial.print(" target=");
-  Serial.print(s_stepper.targetPosition());
+  Serial.print(stepper_target_position());
   Serial.print(" dist=");
-  Serial.println(s_stepper.distanceToGo());
+  Serial.println(stepper_distance_to_go());
 #endif
 }
 }  // namespace
 
 void elevator_setup() {
-  pinMode(SSC_PIN_STEP, OUTPUT);
-  pinMode(SSC_PIN_DIR, OUTPUT);
-  digitalWrite(SSC_PIN_STEP, LOW);
-  digitalWrite(SSC_PIN_DIR, LOW);
-
 #if SSC_ENDSTOP_USE_INPUT_PULLUP
   pinMode(SSC_PIN_ENDSTOP_UP, INPUT_PULLUP);
   pinMode(SSC_PIN_ENDSTOP_DOWN, INPUT_PULLUP);
@@ -376,8 +420,16 @@ void elevator_setup() {
 
   s_tmc_serial.begin(SSC_TMC_UART_BAUD, SERIAL_8N1, SSC_TMC_UART_RX_PIN, SSC_TMC_UART_TX_PIN);
 
-  pinMode(SSC_PIN_EN, OUTPUT);
-  digitalWrite(SSC_PIN_EN, LOW);
+  s_stepper_engine.init();
+  s_stepper = s_stepper_engine.stepperConnectToPin(SSC_PIN_STEP);
+  if (!s_stepper) {
+    Serial.println("[EV] FastAccelStepper connect failed");
+    s_state = EV_ERROR;
+    return;
+  }
+  s_stepper->setDirectionPin(SSC_PIN_DIR);
+  s_stepper->setEnablePin(SSC_PIN_EN, true);
+  s_stepper->setAutoEnable(true);
 
   s_driver.begin();
   s_driver.pdn_disable(true);
@@ -390,7 +442,7 @@ void elevator_setup() {
   s_driver.TPWMTHRS(SSC_TMC_TPWMTHRS);
 
   configure_motion_defaults();
-  s_stepper.setCurrentPosition(0);
+  stepper_set_current_position(0);
 
   load_calibration();
   elevator_load_motion_profile();
@@ -422,9 +474,9 @@ int32_t elevator_top_margin_steps() { return s_top_margin_steps; }
 int32_t elevator_bottom_margin_steps() { return s_bottom_margin_steps; }
 bool elevator_is_homed_zero() { return s_is_homed_zero; }
 int32_t elevator_target_floor() { return s_target_floor; }
-int32_t elevator_current_position_steps() { return s_stepper.currentPosition(); }
-int32_t elevator_target_position_steps() { return s_stepper.targetPosition(); }
-int32_t elevator_distance_to_go_steps() { return s_stepper.distanceToGo(); }
+int32_t elevator_current_position_steps() { return stepper_current_position(); }
+int32_t elevator_target_position_steps() { return stepper_target_position(); }
+int32_t elevator_distance_to_go_steps() { return stepper_distance_to_go(); }
 bool elevator_is_moving() { return s_move_active; }
 uint32_t elevator_motor_lag_count() { return s_motor_lag_count; }
 uint32_t elevator_motor_lag_last_interval_ms() { return s_motor_lag_last_interval_ms; }
@@ -434,14 +486,14 @@ uint32_t elevator_motor_lag_accumulated_ms() { return s_motor_lag_accumulated_ms
 bool elevator_set_move_max_speed(float speed_steps_per_sec) {
   if (speed_steps_per_sec <= 0.0f) return false;
   s_move_max_speed = speed_steps_per_sec;
-  s_stepper.setMaxSpeed(s_move_max_speed);
+  stepper_set_max_speed(s_move_max_speed);
   return true;
 }
 
 bool elevator_set_move_acceleration(float accel_steps_per_sec2) {
   if (accel_steps_per_sec2 <= 0.0f) return false;
   s_move_acceleration = accel_steps_per_sec2;
-  s_stepper.setAcceleration(s_move_acceleration);
+  stepper_set_acceleration(s_move_acceleration);
   return true;
 }
 
@@ -481,7 +533,7 @@ void elevator_stop() {
   s_homing.active = false;
 
   if (s_move_active) {
-    s_stepper.stop();
+    stepper_stop();
   }
 }
 
@@ -497,25 +549,25 @@ void handleInput(int32_t target_steps) {
   s_homing.active = false;
 
   configure_motion_defaults();
-  s_stepper.moveTo(target_steps);
+  stepper_move_to(target_steps);
 
   s_target_floor = target_steps / (int32_t)SSC_STEPS_PER_FLOOR;
   s_move_active = true;
   s_move_start_ms = millis();
   s_last_check_ms = s_move_start_ms;
-  const int32_t travel_steps = abs(s_stepper.distanceToGo());
-  const float max_speed = s_stepper.maxSpeed();
+  const int32_t travel_steps = abs(stepper_distance_to_go());
+  const float max_speed = s_move_max_speed;
   const uint32_t dynamic_timeout_ms =
       (max_speed > 1.0f) ? (uint32_t)((1000.0f * (float)travel_steps) / max_speed) + 5000 : 20000;
   s_move_timeout_ms = (dynamic_timeout_ms < 20000) ? 20000 : dynamic_timeout_ms;
-  s_state = (target_steps >= s_stepper.currentPosition()) ? EV_MOVING_UP : EV_MOVING_DOWN;
+  s_state = (target_steps >= stepper_current_position()) ? EV_MOVING_UP : EV_MOVING_DOWN;
 
   Serial.print("New target: ");
   Serial.println(target_steps);
   Serial.print("Current position: ");
-  Serial.println(s_stepper.currentPosition());
+  Serial.println(stepper_current_position());
   Serial.print("Distance to go: ");
-  Serial.println(s_stepper.distanceToGo());
+  Serial.println(stepper_distance_to_go());
 }
 
 void handleSerialInput() {
@@ -585,8 +637,6 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
 
   monitor_motor_tick_interval(now_ms);
   keep_spin_target_ahead();
-  s_stepper.run();
-
   if (now_ms - s_last_check_ms < 20) return;
   s_last_check_ms = now_ms;
 
@@ -594,11 +644,11 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
   if (s_homing.active) return;
   if (s_state == EV_ERROR) return;
 
-  if (!s_spin_mode && !s_homing.active && endstop_hit_up() && s_stepper.distanceToGo() > 0) {
+  if (!s_spin_mode && !s_homing.active && endstop_hit_up() && stepper_distance_to_go() > 0) {
     emergency_stop_with_error(now_ms, out_event, 1001);
     return;
   }
-  if (!s_spin_mode && !s_homing.active && endstop_hit_down() && s_stepper.distanceToGo() < 0) {
+  if (!s_spin_mode && !s_homing.active && endstop_hit_down() && stepper_distance_to_go() < 0) {
     zero_at_bottom_endstop();
     emergency_stop_with_error(now_ms, out_event, 1002);
     return;
@@ -615,11 +665,11 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
     return;
   }
 
-  if (!s_stepper.isRunning()) {
+  if (!stepper_is_running()) {
     if (s_move_active) {
       s_move_active = false;
       if (s_position_mode && (s_state == EV_MOVING_UP || s_state == EV_MOVING_DOWN)) {
-        s_current_floor = s_stepper.currentPosition() / (int32_t)SSC_STEPS_PER_FLOOR;
+        s_current_floor = stepper_current_position() / (int32_t)SSC_STEPS_PER_FLOOR;
         s_state = EV_ARRIVED;
         if (out_event) {
           out_event->type = EVT_EV_ARRIVED;
@@ -631,7 +681,7 @@ void elevator_tick(uint32_t now_ms, Event* out_event) {
     }
 
     if (s_state == EV_ARRIVED && s_position_mode) {
-      s_stepper.setCurrentPosition((int32_t)s_current_floor * (int32_t)SSC_STEPS_PER_FLOOR);
+      stepper_set_current_position((int32_t)s_current_floor * (int32_t)SSC_STEPS_PER_FLOOR);
     }
   }
 }

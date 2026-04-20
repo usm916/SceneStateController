@@ -9,7 +9,7 @@
 ## Libraries (Arduino IDE Library Manager)
 - Arduino-IRremote (4.x)
 - FastLED
-- AccelStepper
+- FastAccelStepper
 - TMCStepper
 
 ## Modes
@@ -81,10 +81,10 @@ Typical starting points for NEMA17-class steppers:
 - `run_current`: 500–800 mA
 - `hold_current`: 30–50%
 
-## Elevator control (AccelStepper版) 使いかた
+## Elevator control (FastAccelStepper版) 使いかた
 
-このプロトタイプでは、EV（ステッピングモーター）制御に `AccelStepper` を使い、
-`moveTo` + `run` で加減速つきの移動を行います。
+このプロトタイプでは、EV（ステッピングモーター）制御に `FastAccelStepper` を使い、
+ハードタイマ ISR 主導で step パルス生成を行います（メインループは状態遷移・保護ロジックを担当）。
 
 ### 挙動の概要
 - 起動時の位置確定は `VOL-` によるゼロホーミングで行います（必要に応じて起動シーケンスへ組み込み）。
@@ -121,7 +121,7 @@ Typical starting points for NEMA17-class steppers:
 - `SSC_STEP_HZ_DEFAULT`（`src/config.h`）:
   位置移動の最大速度（step/s相当）。
 - `kMoveAccelerationDefault`（`src/elevator_module.cpp`）:
-  加速度（step/s^2）。大きすぎると脱調しやすいので徐々に上げる。
+  加速度（step/s^2相当）。大きすぎると脱調しやすいので徐々に上げる。
 - `kHomingFastSpeed` / `kHomingSlowSpeed`（`src/elevator_module.cpp`）:
   ホーミング時の高速/低速の速度。
 - `kHomingBackoffSteps`（`src/elevator_module.cpp`）:
