@@ -43,6 +43,41 @@ If you want endstops without internal pull-up:
 - `TMC HOLD <0..100>`: hold current percentage relative to run current.
 - `TMC INFO`: prints current settings.
 
+## LEDデバイスへパススルーできるコマンド一覧
+
+前提:
+- ESP-NOW Link の role が `MANAGER` のときのみ、LEDノードへ転送されます。
+- 受信側（LED NODE）では `CMD_SET_UPDATES / CMD_SET_BRIGHTNESS / CMD_SET_PATTERN / CMD_SET_STRIP_SCENE / CMD_SET_ALL_SCENE` を適用します。
+
+### Serialコマンド（USB/PIシリアル入力）
+- `LED <pattern>`
+  - 例: `LED 2`
+  - 値: `0=IDLE, 1=MOVING, 2=ARRIVED, 3=ERROR`
+  - 動作: LEDパターンを更新し、MANAGER時は `SET_PATTERN` をLEDノードへ送信。
+
+- `brightness_<0..100>`
+  - 例: `brightness_35`
+  - 動作: 全体輝度を更新し、MANAGER時は `SET_BRIGHTNESS` をLEDノードへ送信。
+
+- `LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>`
+  - 例: `LEDSCENE 3 CHASE` / `LEDSCENE ALL BLACKOUT`
+  - 動作: 指定ストリップ（または全ストリップ）のシーンを更新し、MANAGER時は `SET_STRIP_SCENE` または `SET_ALL_SCENE` をLEDノードへ送信。
+
+### HTTP API（`POST /led-control`）
+次のパラメータは単独で解釈され、該当操作がLEDノードへパススルーされます。
+
+- `update_enabled=0|1`
+  - 動作: LED更新ループのON/OFF。MANAGER時は `SET_UPDATES` を送信。
+
+- `brightness_pct=<0..100>`
+  - 動作: 全体輝度更新。MANAGER時は `SET_BRIGHTNESS` を送信。
+
+- `pattern=<0..3>`
+  - 動作: パターン更新。MANAGER時は `SET_PATTERN` を送信。
+
+- `strip=<0..5|ALL>` + `scene=<SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>`
+  - 動作: ストリップ単位/全体シーン更新。MANAGER時は `SET_STRIP_SCENE` または `SET_ALL_SCENE` を送信。
+
 ## INFO系コマンド一覧（Serial）
 
 ステータス確認で使うコマンドをここにまとめます。
