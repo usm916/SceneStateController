@@ -20,6 +20,9 @@ static const char kControllerSettingsSectionTemplate[] =
 #include "tmc2209_module.h"
 #include "runtime_mode.h"
 
+static constexpr const char* kPrefsNamespace = "app";
+static constexpr const char* kRuntimeModeKey = "runtime_mode";
+
 // ------------------------------------------------------------
 // public
 // ------------------------------------------------------------
@@ -76,6 +79,17 @@ void WebOtaBlinkApp::loop()
   }
 }
 
+bool WebOtaBlinkApp::getSavedRuntimeMode(uint8_t* out_mode) const
+{
+  if (out_mode == nullptr || !hasSavedRuntimeMode_)
+  {
+    return false;
+  }
+
+  *out_mode = savedRuntimeMode_;
+  return true;
+}
+
 // ------------------------------------------------------------
 // settings
 // ------------------------------------------------------------
@@ -95,7 +109,14 @@ void WebOtaBlinkApp::setDefaultSettings()
 
 void WebOtaBlinkApp::loadSettings()
 {
-  prefs_.begin("app", true);
+  prefs_.begin(kPrefsNamespace, true);
+
+  hasSavedRuntimeMode_ = prefs_.isKey(kRuntimeModeKey);
+  if (hasSavedRuntimeMode_)
+  {
+    const uint8_t modeMask = prefs_.getUChar(kRuntimeModeKey, RUNTIME_MODE_ALL) & RUNTIME_MODE_ALL;
+    savedRuntimeMode_ = (modeMask == 0) ? RUNTIME_MODE_ALL : modeMask;
+  }
 
   for (int i = 0; i < kMaxWifiSlots; ++i)
   {
@@ -132,7 +153,7 @@ void WebOtaBlinkApp::loadSettings()
 
 void WebOtaBlinkApp::saveSettings()
 {
-  prefs_.begin("app", false);
+  prefs_.begin(kPrefsNamespace, false);
 
   for (int i = 0; i < kMaxWifiSlots; ++i)
   {
@@ -144,6 +165,19 @@ void WebOtaBlinkApp::saveSettings()
   }
 
   prefs_.end();
+}
+
+void WebOtaBlinkApp::saveRuntimeModeSetting(uint8_t mode)
+{
+  const uint8_t modeMask = mode & RUNTIME_MODE_ALL;
+  const uint8_t normalizedMode = (modeMask == 0) ? RUNTIME_MODE_ALL : modeMask;
+
+  prefs_.begin(kPrefsNamespace, false);
+  prefs_.putUChar(kRuntimeModeKey, normalizedMode);
+  prefs_.end();
+
+  savedRuntimeMode_ = normalizedMode;
+  hasSavedRuntimeMode_ = true;
 }
 
 // ------------------------------------------------------------
@@ -617,6 +651,7 @@ void WebOtaBlinkApp::handleRuntimeMode(AsyncWebServerRequest* request)
   if (request->hasParam("all", true))
   {
     runtime_mode_set(RUNTIME_MODE_ALL);
+    saveRuntimeModeSetting(runtime_mode_get());
     request->send(200, "text/plain; charset=utf-8", String((int)runtime_mode_get()));
     return;
   }
@@ -638,6 +673,7 @@ void WebOtaBlinkApp::handleRuntimeMode(AsyncWebServerRequest* request)
 
   const uint8_t current = runtime_mode_get();
   runtime_mode_set(current ^ (uint8_t)flag);
+  saveRuntimeModeSetting(runtime_mode_get());
   request->send(200, "text/plain; charset=utf-8", String((int)runtime_mode_get()));
 }
 
