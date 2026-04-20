@@ -17,6 +17,7 @@ static const char kControllerSettingsSectionTemplate[] =
 #include "led_module.h"
 #include "scene_controller.h"
 #include "tmc2209_module.h"
+#include "runtime_mode.h"
 
 // ------------------------------------------------------------
 // public
@@ -290,6 +291,7 @@ void WebOtaBlinkApp::registerRoutes()
   server_.on("/save-control", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSaveControl(request); });
   server_.on("/led-control", HTTP_POST, [this](AsyncWebServerRequest* request) { handleLedControl(request); });
   server_.on("/scene-control", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSceneControl(request); });
+  server_.on("/runtime-mode", HTTP_POST, [this](AsyncWebServerRequest* request) { handleRuntimeMode(request); });
   server_.on("/press-btn", HTTP_POST, [this](AsyncWebServerRequest* request) { handlePressButton(request); });
   server_.on("/set-toggle", HTTP_POST, [this](AsyncWebServerRequest* request) { handleSetToggle(request); });
   server_.on("/reboot", HTTP_GET, [this](AsyncWebServerRequest* request) { handleReboot(request); });
@@ -602,6 +604,40 @@ void WebOtaBlinkApp::handleSceneControl(AsyncWebServerRequest* request)
   }
 
   request->send(200, "text/plain; charset=utf-8", String("scene updated: ") + scene_name(scene_current()));
+}
+
+void WebOtaBlinkApp::handleRuntimeMode(AsyncWebServerRequest* request)
+{
+  if (request == nullptr)
+  {
+    return;
+  }
+
+  if (request->hasParam("all", true))
+  {
+    runtime_mode_set(RUNTIME_MODE_ALL);
+    request->send(200, "text/plain; charset=utf-8", String((int)runtime_mode_get()));
+    return;
+  }
+
+  if (!request->hasParam("flag", true))
+  {
+    request->send(400, "text/plain; charset=utf-8", "missing flag");
+    return;
+  }
+
+  int32_t flag = 0;
+  if (!parseIntParam(request, "flag", &flag) ||
+      (flag != RUNTIME_MODE_IR && flag != RUNTIME_MODE_LED &&
+       flag != RUNTIME_MODE_ELEVATOR && flag != RUNTIME_MODE_SCENE))
+  {
+    request->send(400, "text/plain; charset=utf-8", "flag must be 1/2/4/8");
+    return;
+  }
+
+  const uint8_t current = runtime_mode_get();
+  runtime_mode_set(current ^ (uint8_t)flag);
+  request->send(200, "text/plain; charset=utf-8", String((int)runtime_mode_get()));
 }
 
 void WebOtaBlinkApp::handleSetToggle(AsyncWebServerRequest* request)
@@ -1009,6 +1045,18 @@ String WebOtaBlinkApp::makeHtml() const
   html += "</div>";
   html += "</div></div>";
 
+  html += "<div class='box'><h2>Runtime Mode</h2>";
+  html += "<div id='runtime-status' class='small'>Ready</div>";
+  html += "<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap;'>";
+  html += "<button id='runtime-ir' type='button' onclick='toggleRuntimeFlag(1)'>IR</button>";
+  html += "<button id='runtime-led' type='button' onclick='toggleRuntimeFlag(2)'>LED</button>";
+  html += "<button id='runtime-elevator' type='button' onclick='toggleRuntimeFlag(4)'>ELEVATOR</button>";
+  html += "<button id='runtime-scene' type='button' onclick='toggleRuntimeFlag(8)'>SCENE</button>";
+  html += "<button type='button' onclick='setRuntimeAll()'>ALL ON</button>";
+  html += "</div>";
+  html += "<p class='small'>s0 と同様に ALL ON は 4 フラグすべてを ON にします。</p>";
+  html += "</div>";
+
   html += "<div class='box'><h2>Wi-Fi Candidates</h2>";
   html += "<form method='POST' action='/save-wifi'>";
 
@@ -1138,6 +1186,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "function setStatus(msg,isErr){const s=document.getElementById('remote-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
   html += "function setLedStatus(msg,isErr){const s=document.getElementById('led-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
   html += "function setSceneStatus(msg,isErr){const s=document.getElementById('scene-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
+  html += "function setRuntimeStatus(msg,isErr){const s=document.getElementById('runtime-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
   html += "function setWakeStatus(msg,isErr){const s=document.getElementById('wake-status');if(!s)return;s.textContent=msg;s.style.color=isErr?'#b00020':'#0b6b2f';}";
   html += "function postForm(url,data){return fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams(data)});}";
   html += "function syncToggleUi(active){const p=document.getElementById('toggle-prev');const n=document.getElementById('toggle-next');if(p)p.classList.toggle('toggle-on',active==='BTN_PREV');if(n)n.classList.toggle('toggle-on',active==='BTN_NEXT');}";
@@ -1160,6 +1209,13 @@ String WebOtaBlinkApp::makeHtml() const
   html += "async function setStripSceneAll(scene){try{const r=await postForm('/led-control',{strip:'ALL',scene:scene});const t=await r.text();setLedStatus((r.ok?('All strips -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "async function setStripScene(){const strip=document.getElementById('led-strip').value;const scene=document.getElementById('led-scene').value;try{const r=await postForm('/led-control',{strip:strip,scene:scene});const t=await r.text();setLedStatus((r.ok?('Strip '+strip+' -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "async function setScene(){const scene=document.getElementById('scene-id').value;try{const r=await postForm('/scene-control',{scene:scene});const t=await r.text();setSceneStatus((r.ok?('Scene -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setSceneStatus('Scene failed: '+e,true);}}";
+  html += "let runtimeModeMask=";
+  html += String((int)runtime_mode_get());
+  html += ";";
+  html += "function modeLabel(mask){return (mask===15)?'ALL':String(mask);}";
+  html += "function updateRuntimeUi(mask){runtimeModeMask=mask;const ids=[[1,'runtime-ir'],[2,'runtime-led'],[4,'runtime-elevator'],[8,'runtime-scene']];for(const e of ids){const btn=document.getElementById(e[1]);if(btn)btn.classList.toggle('toggle-on',(mask&e[0])!==0);}setRuntimeStatus('Runtime mode: '+modeLabel(mask),false);}";
+  html += "async function toggleRuntimeFlag(flag){try{const r=await postForm('/runtime-mode',{flag:String(flag)});const t=await r.text();if(!r.ok){setRuntimeStatus('Mode update failed: '+t,true);return;}const mask=parseInt(t,10);if(Number.isNaN(mask)){setRuntimeStatus('Mode response invalid: '+t,true);return;}updateRuntimeUi(mask);}catch(e){setRuntimeStatus('Mode update failed: '+e,true);}}";
+  html += "async function setRuntimeAll(){try{const r=await postForm('/runtime-mode',{all:'1'});const t=await r.text();if(!r.ok){setRuntimeStatus('ALL failed: '+t,true);return;}const mask=parseInt(t,10);if(Number.isNaN(mask)){setRuntimeStatus('ALL response invalid: '+t,true);return;}updateRuntimeUi(mask);}catch(e){setRuntimeStatus('ALL failed: '+e,true);}}";
   html += "let ledBrightnessApplyTimer=0;";
   html += "let ledBrightnessReqSeq=0;";
   html += "let ledBrightnessAckSeq=0;";
@@ -1179,6 +1235,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "initWakeLockUi();";
   html += "updateLedToggleUi();";
   html += "initBrightnessControl();";
+  html += "updateRuntimeUi(runtimeModeMask);";
   html += "</script>";
 
   html += "</body></html>";
