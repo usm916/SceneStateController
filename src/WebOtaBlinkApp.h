@@ -56,6 +56,7 @@ private:
   void handleSaveControl(AsyncWebServerRequest* request);
   void handleLedControl(AsyncWebServerRequest* request);
   void handleSceneControl(AsyncWebServerRequest* request);
+  void handleRuntimeMode(AsyncWebServerRequest* request);
   void handlePressButton(AsyncWebServerRequest* request);
   void handleSetToggle(AsyncWebServerRequest* request);
   void handleReboot(AsyncWebServerRequest* request);

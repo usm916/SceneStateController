@@ -13,17 +13,18 @@
 #include "src/console_logger.h"
 #include "src/shared_serial.h"
 #include "src/button_position_store.h"
+#include "src/runtime_mode.h"
 
 WebOtaBlinkApp app;
 
 static ConsoleLogger s_log(Serial);
 
 static uint8_t s_runtime_mode = SSC_MODE;
-static constexpr uint8_t MODE_IR = 0x01;
-static constexpr uint8_t MODE_LED = 0x02;
-static constexpr uint8_t MODE_ELEVATOR = 0x04;
-static constexpr uint8_t MODE_SCENE = 0x08;
-static constexpr uint8_t MODE_ALL = MODE_IR | MODE_LED | MODE_ELEVATOR | MODE_SCENE;
+static constexpr uint8_t MODE_IR = RUNTIME_MODE_IR;
+static constexpr uint8_t MODE_LED = RUNTIME_MODE_LED;
+static constexpr uint8_t MODE_ELEVATOR = RUNTIME_MODE_ELEVATOR;
+static constexpr uint8_t MODE_SCENE = RUNTIME_MODE_SCENE;
+static constexpr uint8_t MODE_ALL = RUNTIME_MODE_ALL;
 static bool s_ir_ready = false;
 static bool s_led_ready = false;
 static bool s_elevator_ready = false;
@@ -107,6 +108,14 @@ static void set_runtime_mode(uint8_t mode) {
     scene_setup();
   }
   s_log.print_mode_change(prev_mode, s_runtime_mode);
+}
+
+uint8_t runtime_mode_get() {
+  return s_runtime_mode;
+}
+
+void runtime_mode_set(uint8_t mode) {
+  set_runtime_mode(mode);
 }
 
 static uint16_t calc_ramp_up_speed(uint32_t now_ms) {
