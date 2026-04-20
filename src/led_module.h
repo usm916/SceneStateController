@@ -30,3 +30,4 @@ bool led_save_global_brightness_pct();
 void led_set_updates_enabled(bool enabled);
 bool led_updates_enabled();
 void led_tick(uint32_t now_ms);
+const char* led_rmt_status_text();

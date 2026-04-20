@@ -1094,6 +1094,9 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div class='box'><h2>LED Scene Control</h2>";
   html += "<div id='led-status' class='small'>Ready</div>";
   html += "<div class='grid'>";
+  html += "<div>FastLED RMT status</div><div>";
+  html += htmlEscape(String(led_rmt_status_text()));
+  html += "</div>";
   html += "<div>LED update loop</div><div>";
   html += "<button id='led-update-toggle' type='button' onclick='toggleLedUpdates()'>-</button>";
   html += "</div>";
