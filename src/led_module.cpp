@@ -5,7 +5,7 @@
 #include <math.h>
 #include <Preferences.h>
 
-static_assert(SSC_LED_STRIP_COUNT == 7, "This firmware currently assumes exactly 7 LED strips.");
+static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
 static_assert(SSC_LED_TARGET_FPS > 0, "SSC_LED_TARGET_FPS must be greater than 0.");
 static_assert(SSC_LED_ACTIVE_STRIP_COUNT > 0, "SSC_LED_ACTIVE_STRIP_COUNT must be greater than 0.");
 static_assert(SSC_LED_ACTIVE_STRIP_COUNT <= SSC_LED_STRIP_COUNT,
@@ -22,11 +22,9 @@ static constexpr LedStripScene kIdleScenes[SSC_LED_STRIP_COUNT] = {
   LEDSCENE_SOLID,
   LEDSCENE_SOLID,
   LEDSCENE_SOLID,
-  LEDSCENE_SOLID,
 };
 
 static constexpr LedStripScene kMovingScenes[SSC_LED_STRIP_COUNT] = {
-  LEDSCENE_CHASE,
   LEDSCENE_CHASE,
   LEDSCENE_CHASE,
   LEDSCENE_CHASE,
@@ -42,11 +40,9 @@ static constexpr LedStripScene kArrivedScenes[SSC_LED_STRIP_COUNT] = {
   LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
   LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
   LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
-  LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
 };
 
 static constexpr LedStripScene kErrorScenes[SSC_LED_STRIP_COUNT] = {
-  LEDSCENE_BLINK,
   LEDSCENE_BLINK,
   LEDSCENE_BLINK,
   LEDSCENE_BLINK,
@@ -114,9 +110,6 @@ static void add_strip_controller(uint8_t strip_index) {
       break;
     case 5:
       FastLED.addLeds<WS2812B, SSC_PIN_WS2812B_5, GRB>(s_leds[5], SSC_LED_STRIP_LEN);
-      break;
-    case 6:
-      FastLED.addLeds<WS2812B, SSC_PIN_WS2812B_6, GRB>(s_leds[6], SSC_LED_STRIP_LEN);
       break;
     default:
       break;
