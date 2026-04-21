@@ -62,8 +62,8 @@ static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] 
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
 static uint32_t s_crash_next_toggle_ms[SSC_LED_STRIP_COUNT] = {0};
 static bool s_crash_on[SSC_LED_STRIP_COUNT] = {false};
-static constexpr uint8_t kColorGuardThreshold = 5;
-static constexpr uint8_t kColorGuardFloor = 3;
+static constexpr uint8_t kColorGuardThreshold = 10;
+static constexpr uint8_t kColorGuardFloor = 6;
 
 static CRGB strip_base_color(uint8_t strip_index) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return CRGB(16, 16, 16);
