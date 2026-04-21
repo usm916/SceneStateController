@@ -1227,7 +1227,8 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<p class='small'>PREV/NEXTはトグル動作です。ON中は継続送信してエレベーターを上下動させます。</p>";
   html += "</div>";
 
-  html += "<div class='box'><h2>Status</h2>";
+  html += "<div class='box compact'><details class='collapsible'>";
+  html += "<summary><h2>Status</h2></summary>";
   html += "<div class='grid'>";
   html += "<div>Mode</div><div>" + currentModeText() + "</div>";
 
@@ -1252,7 +1253,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div>Loop frame avg10 (ms)</div><div class='mono'>";
   html += String(frame_timing_avg_last_10_ms());
   html += "</div>";
-  html += "</div></div>";
+  html += "</div></details></div>";
 
   html += "<div class='box'><h2>Runtime Mode</h2>";
   html += "<div id='runtime-status' class='small'>Ready</div>";
