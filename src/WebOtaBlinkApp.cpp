@@ -588,19 +588,9 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
 
   int32_t updateEnabled = -1;
   if (parseIntParam(request, "update_enabled", &updateEnabled)) {
-    if (updateEnabled == 0 || updateEnabled == 1) {
-      const bool enabled = (updateEnabled == 1);
-      led_set_updates_enabled(enabled);
-      if (espnow_link_is_manager()) {
-        (void)espnow_link_send_updates_enabled(enabled);
-        sendEspnowWebEcho(request, String("update_enabled=") + (enabled ? "1" : "0"));
-        return;
-      }
-      request->send(200, "text/plain; charset=utf-8",
-                    led_updates_enabled() ? "led updates enabled" : "led updates disabled");
-      return;
-    }
-    request->send(400, "text/plain; charset=utf-8", "update_enabled must be 0 or 1");
+    (void)updateEnabled;
+    request->send(200, "text/plain; charset=utf-8",
+                  "update_enabled is deprecated (LED updates always enabled)");
     return;
   }
 
@@ -1353,9 +1343,6 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div>FastLED RMT status</div><div>";
   html += htmlEscape(String(led_rmt_status_text()));
   html += "</div>";
-  html += "<div>LED update loop</div><div>";
-  html += "<button id='led-update-toggle' type='button' onclick='toggleLedUpdates()'>-</button>";
-  html += "</div>";
   html += "<div>Scene pattern</div><div>";
   html += "<button type='button' onclick='setLedPattern(0)'>IDLE</button> ";
   html += "<button type='button' onclick='setLedPattern(1)'>MOVING</button> ";
@@ -1461,10 +1448,6 @@ String WebOtaBlinkApp::makeHtml() const
   html += "async function sendBtn(btn){try{const r=await postForm('/press-btn',{btn:btn});const t=await r.text();setStatus((r.ok?t:('Send failed: '+t)),!r.ok);}catch(e){setStatus('Send failed: '+e,true);}}";
   html += "async function toggleBtn(btn,el){const on=!el.classList.contains('toggle-on');try{const r=await postForm('/set-toggle',{btn:btn,on:on?'1':'0'});const t=await r.text();if(r.ok){syncToggleUi(on?btn:'');setStatus(t,false);}else{setStatus('Toggle failed: '+t,true);}}catch(e){setStatus('Toggle failed: '+e,true);}}";
   html += "async function setLedPattern(pattern){try{const r=await postForm('/led-control',{pattern:String(pattern)});const t=await r.text();setLedStatus((r.ok?('Pattern set: '+pattern):('Pattern failed: '+t)),!r.ok);}catch(e){setLedStatus('Pattern failed: '+e,true);}}";
-  html += "let ledUpdatesEnabled=";
-  html += led_updates_enabled() ? "true;" : "false;";
-  html += "function updateLedToggleUi(){const btn=document.getElementById('led-update-toggle');if(!btn)return;btn.textContent=ledUpdatesEnabled?'Turn OFF updates':'Turn ON updates';}";
-  html += "async function toggleLedUpdates(){const next=!ledUpdatesEnabled;try{const r=await postForm('/led-control',{update_enabled:next?'1':'0'});const t=await r.text();if(r.ok){ledUpdatesEnabled=next;updateLedToggleUi();setLedStatus(t,false);}else{setLedStatus('Toggle failed: '+t,true);}}catch(e){setLedStatus('Toggle failed: '+e,true);}}";
   html += "async function setStripSceneAll(scene){try{const r=await postForm('/led-control',{strip:'ALL',scene:scene});const t=await r.text();setLedStatus((r.ok?('All strips -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "async function setStripScene(){const strip=document.getElementById('led-strip').value;const scene=document.getElementById('led-scene').value;try{const r=await postForm('/led-control',{strip:strip,scene:scene});const t=await r.text();setLedStatus((r.ok?('Strip '+strip+' -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "async function setScene(){const scene=document.getElementById('scene-id').value;try{const r=await postForm('/scene-control',{scene:scene});const t=await r.text();setSceneStatus((r.ok?('Scene -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setSceneStatus('Scene failed: '+e,true);}}";
@@ -1495,7 +1478,6 @@ String WebOtaBlinkApp::makeHtml() const
   }
   html += "');";
   html += "initWakeLockUi();";
-  html += "updateLedToggleUi();";
   html += "initBrightnessControl();";
   html += "updateRuntimeUi(runtimeModeMask);";
   html += "</script>";
