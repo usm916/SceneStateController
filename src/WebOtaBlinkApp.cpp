@@ -1127,14 +1127,51 @@ String WebOtaBlinkApp::makeHtml() const
     const uint8_t b = blueFromWebColor(webColor);
     return (r < 128 || g < 128 || b < 128) ? "rgb(255,255,255)" : "rgb(48,48,48)";
   };
+  auto currentIpLastOctet = [&]() -> uint8_t
+  {
+    IPAddress ip(0, 0, 0, 0);
+    if (apMode_)
+    {
+      ip = WiFi.softAPIP();
+    }
+    else if (WiFi.status() == WL_CONNECTED)
+    {
+      ip = WiFi.localIP();
+    }
+    return ip[3];
+  };
+  auto pageBgColorFromIpLastOctet = [&](uint8_t ipLastOctet) -> uint32_t
+  {
+    // 同じIP末尾なら毎回同じ色、異なるIP末尾なら擬似ランダムで違う色にする。
+    uint32_t state = ((uint32_t)ipLastOctet * 1103515245UL) + 12345UL;
+    auto nextRand = [&]() -> uint8_t
+    {
+      state = (state * 1664525UL) + 1013904223UL;
+      return (uint8_t)(state >> 24);
+    };
+    const uint8_t r = (uint8_t)(96 + (nextRand() % 128));
+    const uint8_t g = (uint8_t)(96 + (nextRand() % 128));
+    const uint8_t b = (uint8_t)(96 + (nextRand() % 128));
+    return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+  };
+
+  const uint8_t ipLastOctet = currentIpLastOctet();
+  const uint32_t pageBgColor = pageBgColorFromIpLastOctet(ipLastOctet);
+  const String pageBgCss = webColorCssText(pageBgColor);
+  const char* pageTextColor = textColorForBg(pageBgColor);
 
   String html;
   html += "<!DOCTYPE html><html><head><meta charset='utf-8'>";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>";
   html += "<title>ESP32 Setup</title>";
   html += "<style>";
-  html += "body{font-family:Arial,sans-serif;max-width:820px;margin:24px auto;padding:0 16px;line-height:1.5;touch-action:manipulation;}";
-  html += ".box{border:1px solid #ccc;border-radius:10px;padding:16px;margin-bottom:16px;}";
+  html += "body{font-family:Arial,sans-serif;max-width:820px;margin:24px auto;padding:0 16px;line-height:1.5;touch-action:manipulation;";
+  html += "background:";
+  html += pageBgCss;
+  html += ";color:";
+  html += pageTextColor;
+  html += ";}";
+  html += ".box{border:1px solid #ccc;border-radius:10px;padding:16px;margin-bottom:16px;background:rgba(255,255,255,0.86);color:#222;}";
   html += "input{width:100%;padding:10px;font-size:16px;box-sizing:border-box;margin-top:4px;}";
   html += "button,a.btn{display:inline-block;padding:10px 14px;margin-top:12px;text-decoration:none;border:1px solid #333;border-radius:8px;background:#f5f5f5;color:#000;}";
   html += ".mono{font-family:monospace;}";
