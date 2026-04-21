@@ -7,6 +7,9 @@
 
 static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
 static_assert(SSC_LED_TARGET_FPS > 0, "SSC_LED_TARGET_FPS must be greater than 0.");
+static_assert(SSC_LED_ACTIVE_STRIP_COUNT > 0, "SSC_LED_ACTIVE_STRIP_COUNT must be greater than 0.");
+static_assert(SSC_LED_ACTIVE_STRIP_COUNT <= SSC_LED_STRIP_COUNT,
+              "SSC_LED_ACTIVE_STRIP_COUNT must be <= SSC_LED_STRIP_COUNT.");
 
 static CRGB s_leds[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN];
 static LedPattern s_pattern = LEDP_IDLE;
@@ -117,7 +120,7 @@ void led_setup() {
   randomSeed(micros());
   led_load_saved_brightness();
 
-  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+  for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
     s_strip_scenes[strip] = LEDSCENE_SOLID;
     s_chase_pos[strip] = 0;
@@ -173,7 +176,7 @@ bool led_updates_enabled() {
 
 static void apply_scene_profile(const LedStripScene* profile) {
   const uint32_t now_ms = millis();
-  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+  for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     s_strip_scenes[strip] = profile[strip];
     s_chase_pos[strip] = 0;
     s_scene_start_ms[strip] = now_ms;
@@ -211,7 +214,7 @@ void led_set_pattern(LedPattern p, bool force_reset) {
 }
 
 void led_set_strip_scene(uint8_t strip_index, LedStripScene scene) {
-  if (strip_index >= SSC_LED_STRIP_COUNT) return;
+  if (strip_index >= SSC_LED_ACTIVE_STRIP_COUNT) return;
   if (s_strip_scenes[strip_index] == scene) return;
   s_strip_scenes[strip_index] = scene;
   s_chase_pos[strip_index] = 0;
@@ -389,7 +392,7 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
 }
 
 static bool has_blink_scene_active() {
-  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+  for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     if (s_strip_scenes[strip] == LEDSCENE_BLINK) return true;
   }
   return false;
@@ -419,7 +422,7 @@ void led_tick(uint32_t now_ms) {
     s_blink_on = true;
   }
 
-  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+  for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     render_strip(strip, now_ms);
   }
 

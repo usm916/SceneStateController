@@ -30,9 +30,13 @@
 
 #define SSC_LED_STRIP_COUNT   6
 #define SSC_LED_STRIP_LEN     72
-#define SSC_LED_BRIGHTNESS    64
+#define SSC_LED_BRIGHTNESS    255
 #ifndef SSC_LED_TARGET_FPS
 #define SSC_LED_TARGET_FPS    60
+#endif
+
+#ifndef SSC_LED_ACTIVE_STRIP_COUNT
+#define SSC_LED_ACTIVE_STRIP_COUNT 1
 #endif
 
 #define SSC_STEPS_PER_FLOOR   25600
