@@ -27,6 +27,8 @@ static constexpr const char* kEspnowRoleKey = "esp_role";
 static constexpr const char* kEspnowChannelKey = "esp_channel";
 static constexpr const char* kEspnowPeerMacKey = "esp_peer_mac";
 static constexpr const char* kSelfStaMacKey = "self_sta_mac";
+static constexpr uint32_t kStripSceneCooldownMs = 500;
+static uint32_t s_lastStripSceneRequestMs = 0;
 
 // ------------------------------------------------------------
 // public
@@ -686,6 +688,14 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
     return;
   }
 
+  const uint32_t nowMs = millis();
+  if (s_lastStripSceneRequestMs != 0 &&
+      (uint32_t)(nowMs - s_lastStripSceneRequestMs) < kStripSceneCooldownMs) {
+    request->send(429, "text/plain; charset=utf-8", "strip scene cooldown active (500ms)");
+    return;
+  }
+  s_lastStripSceneRequestMs = nowMs;
+
   if (applyAllStrips) {
     for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
       led_set_strip_scene(strip, scene);
@@ -1162,6 +1172,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += pageTextColor;
   html += ";}";
   html += ".box{border:1px solid #ccc;border-radius:10px;padding:16px;margin-bottom:16px;background:rgba(255,255,255,0.86);color:#222;}";
+  html += ".box.compact{padding:12px 14px;}";
   html += "input{width:100%;padding:10px;font-size:16px;box-sizing:border-box;margin-top:4px;}";
   html += "button,a.btn{display:inline-block;padding:10px 14px;margin-top:12px;text-decoration:none;border:1px solid #333;border-radius:8px;background:#f5f5f5;color:#000;}";
   html += ".mono{font-family:monospace;}";
@@ -1172,6 +1183,9 @@ String WebOtaBlinkApp::makeHtml() const
   html += ".toggle-on{filter:brightness(0.55);}";
   html += "#remote-status{min-height:1.4em;font-weight:bold;}";
   html += ".small{font-size:0.9em;color:#555;}";
+  html += "details.collapsible>summary{cursor:pointer;font-weight:700;}";
+  html += "details.collapsible[open]>summary{margin-bottom:10px;}";
+  html += "details.collapsible>summary h2{display:inline;font-size:1.05em;margin:0;}";
   html += "</style></head><body>";
 
   html += "<h1>ESP32 Web Setup</h1>";
@@ -1223,7 +1237,8 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<p class='small'>PREV/NEXTはトグル動作です。ON中は継続送信してエレベーターを上下動させます。</p>";
   html += "</div>";
 
-  html += "<div class='box'><h2>Status</h2>";
+  html += "<div class='box compact'><details class='collapsible'>";
+  html += "<summary><h2>Status</h2></summary>";
   html += "<div class='grid'>";
   html += "<div>Mode</div><div>" + currentModeText() + "</div>";
 
@@ -1248,7 +1263,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div>Loop frame avg10 (ms)</div><div class='mono'>";
   html += String(frame_timing_avg_last_10_ms());
   html += "</div>";
-  html += "</div></div>";
+  html += "</div></details></div>";
 
   html += "<div class='box'><h2>Runtime Mode</h2>";
   html += "<div id='runtime-status' class='small'>Ready</div>";
@@ -1262,7 +1277,8 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<p class='small'>s0 と同様に ALL ON は 4 フラグすべてを ON にします。</p>";
   html += "</div>";
 
-  html += "<div class='box'><h2>Wi-Fi Candidates</h2>";
+  html += "<div class='box compact'><details class='collapsible'>";
+  html += "<summary><h2>Wi-Fi Candidates</h2></summary>";
   html += "<form method='POST' action='/save-wifi'>";
 
   for (int i = 0; i < kMaxWifiSlots; ++i)
@@ -1329,7 +1345,7 @@ String WebOtaBlinkApp::makeHtml() const
 
   html += "<p class='small'>保存後に再起動し、SSID1→SSID2→SSID3の順に各SSIDを1回だけ試します。ESP-NOW role/peer/channel も同時に適用します。</p>";
   html += "<button type='submit'>Save Wi-Fi Settings</button>";
-  html += "</form></div>";
+  html += "</form></details></div>";
 
   html += "<div class='box'><h2>OTA</h2>";
   html += "<a class='btn' href='/update'>Open Web OTA</a>";

@@ -1,7 +1,7 @@
 R"HTML(
-<div class='box'>
-<details>
-<summary>Controller Settings</summary>
+<div class='box compact'>
+<details class='collapsible'>
+<summary><h2>Controller Settings</h2></summary>
 <form method='POST' action='/save-control'>
 <label>TMC run current (mA)</label>
 <input name='tmc_run_current_ma' type='number' min='1' max='2000' value='{{TMC_RUN_CURRENT_MA}}'>

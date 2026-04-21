@@ -229,7 +229,6 @@ void led_set_pattern(LedPattern p, bool force_reset) {
 
 void led_set_strip_scene(uint8_t strip_index, LedStripScene scene) {
   if (strip_index >= SSC_LED_ACTIVE_STRIP_COUNT) return;
-  if (s_strip_scenes[strip_index] == scene) return;
   s_strip_scenes[strip_index] = scene;
   s_chase_pos[strip_index] = 0;
   s_scene_start_ms[strip_index] = millis();
@@ -300,7 +299,7 @@ static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint3
 }
 
 static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
-  const bool settle_on = (now_ms - s_scene_start_ms[strip_index]) >= 2000;
+  const bool settle_on = (now_ms - s_scene_start_ms[strip_index]) >= 1500;
   if (settle_on) {
     paint_strip_solid(strip_index, apply_brightness(base, 255));
     return;
@@ -308,10 +307,10 @@ static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const C
 
   if (s_crash_next_toggle_ms[strip_index] == 0) {
     s_crash_on[strip_index] = (random(0, 100) < 50);
-    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(40, 180);
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(20, 80);
   } else if (now_ms >= s_crash_next_toggle_ms[strip_index]) {
     s_crash_on[strip_index] = !s_crash_on[strip_index];
-    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(80, 320);
+    s_crash_next_toggle_ms[strip_index] = now_ms + (uint32_t)random(40, 240);
   }
 
   paint_strip_solid(strip_index, s_crash_on[strip_index] ? apply_brightness(base, 255) : CRGB::Black);
