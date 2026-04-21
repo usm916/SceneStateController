@@ -1339,6 +1339,16 @@ String WebOtaBlinkApp::makeHtml() const
 
   html += "<div class='box'><h2>LED Scene Control</h2>";
   html += "<div id='led-status' class='small'>Ready</div>";
+  html += "<div style='margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;'>";
+  html += "<label for='led-brightness-input'>LED brightness (%)</label>";
+  html += "<input id='led-brightness-input' type='number' min='0' max='100' value='";
+  html += String(led_global_brightness_pct());
+  html += "'>";
+  html += "<input id='led-brightness-slider' type='range' min='0' max='100' value='";
+  html += String(led_global_brightness_pct());
+  html += "'>";
+  html += "</div>";
+  html += "<p class='small'>スライダー/数値入力はリアルタイム反映されます。Controller SettingsのSaveでNVSに保存します。</p>";
   html += "<div class='grid'>";
   html += "<div>FastLED RMT status</div><div>";
   html += htmlEscape(String(led_rmt_status_text()));
