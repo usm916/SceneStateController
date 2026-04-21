@@ -52,8 +52,7 @@ static constexpr LedStripScene kErrorScenes[SSC_LED_STRIP_COUNT] = {
 
 static uint32_t s_last_ms = 0;
 static uint16_t s_chase_pos[SSC_LED_STRIP_COUNT] = {0};
-static bool s_blink_on = false;
-static uint32_t s_blink_last_toggle_ms = 0;
+static uint8_t s_blink_level = 255;
 static uint8_t s_global_brightness_pct = 100;
 static constexpr const char* kLedPrefsNamespace = "led";
 static constexpr const char* kLedBrightnessKey = "brightness";
@@ -207,8 +206,7 @@ void led_set_pattern(LedPattern p, bool force_reset) {
   if (!force_reset && s_pattern == p) return;
   s_pattern = p;
   s_last_ms = 0;
-  s_blink_on = false;
-  s_blink_last_toggle_ms = 0;
+  s_blink_level = 255;
 
   switch (p) {
     case LEDP_MOVING:
@@ -326,9 +324,9 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
       break;
     case LEDSCENE_BLINK:
       if (s_pattern == LEDP_ERROR) {
-        paint_strip_solid(strip_index, s_blink_on ? error_color : CRGB::Black);
+        paint_strip_solid(strip_index, apply_brightness_linear(error_color, s_blink_level));
       } else {
-        paint_strip_solid(strip_index, s_blink_on ? apply_brightness(base, 255) : CRGB::Black);
+        paint_strip_solid(strip_index, apply_brightness(base, s_blink_level));
       }
       break;
     case LEDSCENE_RANDOM_LONG_BLINK_THEN_ON:
@@ -378,13 +376,12 @@ void led_tick(uint32_t now_ms) {
   if ((now_ms - s_last_ms) >= interval_ms) s_last_ms = now_ms;
 
   if (s_pattern == LEDP_ERROR || s_pattern == LEDP_ARRIVED || has_blink_scene_active()) {
-    const uint32_t blink_interval_ms = (s_pattern == LEDP_ERROR) ? 200UL : 50UL;
-    if (s_blink_last_toggle_ms == 0 || (now_ms - s_blink_last_toggle_ms) >= blink_interval_ms) {
-      s_blink_on = !s_blink_on;
-      s_blink_last_toggle_ms = now_ms;
-    }
+    const uint32_t blink_period_ms = (s_pattern == LEDP_ERROR) ? 500UL : 1200UL;
+    const uint32_t phase_ms = now_ms % blink_period_ms;
+    const uint8_t phase_8 = (uint8_t)((phase_ms * 255UL) / blink_period_ms);
+    s_blink_level = sin8(phase_8);
   } else {
-    s_blink_on = true;
+    s_blink_level = 255;
   }
 
   for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
