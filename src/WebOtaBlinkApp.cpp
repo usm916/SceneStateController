@@ -1300,7 +1300,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += htmlEscape(espnowPeerMacText());
   html += "'>";
 
-  html += "<p class='small'>保存後に再起動し、各SSIDを3回ずつ順番に試します。ESP-NOW role/peer/channel も同時に適用します。</p>";
+  html += "<p class='small'>保存後に再起動し、SSID1→SSID2→SSID3の順に各SSIDを1回だけ試します。ESP-NOW role/peer/channel も同時に適用します。</p>";
   html += "<button type='submit'>Save Wi-Fi Settings</button>";
   html += "</form></div>";
 

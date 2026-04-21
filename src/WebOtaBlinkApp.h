@@ -16,7 +16,7 @@ public:
 
 private:
   static constexpr int kMaxWifiSlots = 3;
-  static constexpr int kWifiRetryPerSsid = 3;
+  static constexpr int kWifiRetryPerSsid = 1;
   static constexpr unsigned long kWifiConnectTimeoutMs = 8000;
 
   struct WifiSlot
