@@ -1162,6 +1162,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += pageTextColor;
   html += ";}";
   html += ".box{border:1px solid #ccc;border-radius:10px;padding:16px;margin-bottom:16px;background:rgba(255,255,255,0.86);color:#222;}";
+  html += ".box.compact{padding:12px 14px;}";
   html += "input{width:100%;padding:10px;font-size:16px;box-sizing:border-box;margin-top:4px;}";
   html += "button,a.btn{display:inline-block;padding:10px 14px;margin-top:12px;text-decoration:none;border:1px solid #333;border-radius:8px;background:#f5f5f5;color:#000;}";
   html += ".mono{font-family:monospace;}";
@@ -1172,6 +1173,9 @@ String WebOtaBlinkApp::makeHtml() const
   html += ".toggle-on{filter:brightness(0.55);}";
   html += "#remote-status{min-height:1.4em;font-weight:bold;}";
   html += ".small{font-size:0.9em;color:#555;}";
+  html += "details.collapsible>summary{cursor:pointer;font-weight:700;}";
+  html += "details.collapsible[open]>summary{margin-bottom:10px;}";
+  html += "details.collapsible>summary h2{display:inline;font-size:1.05em;margin:0;}";
   html += "</style></head><body>";
 
   html += "<h1>ESP32 Web Setup</h1>";
@@ -1262,7 +1266,8 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<p class='small'>s0 と同様に ALL ON は 4 フラグすべてを ON にします。</p>";
   html += "</div>";
 
-  html += "<div class='box'><h2>Wi-Fi Candidates</h2>";
+  html += "<div class='box compact'><details class='collapsible'>";
+  html += "<summary><h2>Wi-Fi Candidates</h2></summary>";
   html += "<form method='POST' action='/save-wifi'>";
 
   for (int i = 0; i < kMaxWifiSlots; ++i)
@@ -1329,7 +1334,7 @@ String WebOtaBlinkApp::makeHtml() const
 
   html += "<p class='small'>保存後に再起動し、SSID1→SSID2→SSID3の順に各SSIDを1回だけ試します。ESP-NOW role/peer/channel も同時に適用します。</p>";
   html += "<button type='submit'>Save Wi-Fi Settings</button>";
-  html += "</form></div>";
+  html += "</form></details></div>";
 
   html += "<div class='box'><h2>OTA</h2>";
   html += "<a class='btn' href='/update'>Open Web OTA</a>";
