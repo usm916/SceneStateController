@@ -62,6 +62,8 @@ static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] 
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
 static uint32_t s_crash_next_toggle_ms[SSC_LED_STRIP_COUNT] = {0};
 static bool s_crash_on[SSC_LED_STRIP_COUNT] = {false};
+static constexpr uint8_t kColorGuardThreshold = 10;
+static constexpr uint8_t kColorGuardFloor = 6;
 
 static CRGB strip_base_color(uint8_t strip_index) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return CRGB(16, 16, 16);
@@ -72,6 +74,23 @@ static CRGB strip_base_color(uint8_t strip_index) {
 static CRGB apply_brightness(const CRGB& base, uint8_t brightness) {
   CRGB scaled = base;
   scaled.nscale8_video(brightness);
+  const bool base_has_all_channels = (base.r > 0) && (base.g > 0) && (base.b > 0);
+  if (!base_has_all_channels) return scaled;
+
+  const bool has_zero_channel = (scaled.r == 0) || (scaled.g == 0) || (scaled.b == 0);
+  if (!has_zero_channel) return scaled;
+
+  const uint8_t max_channel = max(scaled.r, max(scaled.g, scaled.b));
+  if (max_channel < kColorGuardThreshold) {
+    if (scaled.r < kColorGuardFloor) scaled.r = kColorGuardFloor;
+    if (scaled.g < kColorGuardFloor) scaled.g = kColorGuardFloor;
+    if (scaled.b < kColorGuardFloor) scaled.b = kColorGuardFloor;
+    return scaled;
+  }
+
+  if (scaled.r == 0) scaled.r = kColorGuardFloor;
+  if (scaled.g == 0) scaled.g = kColorGuardFloor;
+  if (scaled.b == 0) scaled.b = kColorGuardFloor;
   return scaled;
 }
 
