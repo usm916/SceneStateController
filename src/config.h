@@ -56,7 +56,7 @@
 // - ROLE is selected from Web UI and stored in Preferences
 // - PEER_MAC should be the STA MAC of the other device.
 #ifndef SSC_ESPNOW_LINK_ENABLE
-#define SSC_ESPNOW_LINK_ENABLE 0
+#define SSC_ESPNOW_LINK_ENABLE 1
 #endif
 
 #ifndef SSC_ESPNOW_LINK_CHANNEL
