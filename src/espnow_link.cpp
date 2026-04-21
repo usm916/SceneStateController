@@ -152,7 +152,6 @@ void espnow_link_setup() {
   if (!link_enabled() || role() == kRoleOff) return;
 
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
 
   if (esp_now_init() != ESP_OK) {
     Serial.println("[ESPNOW] init failed");
