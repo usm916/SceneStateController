@@ -2,7 +2,6 @@
 #include "config.h"
 #include <Arduino.h>
 #include <FastLED.h>
-#include <math.h>
 #include <Preferences.h>
 
 static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
@@ -63,10 +62,6 @@ static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] 
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
 static uint32_t s_crash_next_toggle_ms[SSC_LED_STRIP_COUNT] = {0};
 static bool s_crash_on[SSC_LED_STRIP_COUNT] = {false};
-static bool s_fade_log_has_prev = false;
-static uint8_t s_fade_log_prev_brightness = 0;
-static uint32_t s_fade_log_prev_time_ms = 0;
-static uint32_t s_fade_log_prev_elapsed_ms = 0;
 
 static CRGB strip_base_color(uint8_t strip_index) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return CRGB(16, 16, 16);
@@ -262,74 +257,26 @@ static void paint_strip_random_long_blink_then_on(uint8_t strip_index, const CRG
   }
 }
 
+static uint8_t smoothstep_progress_8(uint32_t elapsed_ms, uint32_t duration_ms) {
+  if (elapsed_ms >= duration_ms) return 255;
+  const uint32_t t_q10 = (elapsed_ms * 1024UL) / duration_ms;  // 0..1023
+  const uint32_t t2_q10 = (t_q10 * t_q10) >> 10;
+  const uint32_t t3_q10 = (t2_q10 * t_q10) >> 10;
+  const uint32_t eased_q10 = (3UL * t2_q10) - (2UL * t3_q10);  // smoothstep
+  return (uint8_t)((eased_q10 * 255UL + 511UL) / 1023UL);
+}
+
 static constexpr uint32_t kLedFadeDurationMs = 5000UL;
-
-static uint8_t wave_to_byte(float wave) {
-  float normalized = (wave + 1.0f) * 0.5f;
-  if (normalized < 0.0f) normalized = 0.0f;
-  if (normalized > 1.0f) normalized = 1.0f;
-  return (uint8_t)(normalized * 255.0f);
-}
-
-static float fade_wave_phase(uint32_t elapsed_ms, uint32_t duration_ms) {
-  if (duration_ms == 0) return 0.0f;
-  const uint32_t cycle_pos_ms = elapsed_ms % duration_ms;
-  return (2.0f * PI * (float)cycle_pos_ms) / (float)duration_ms;
-}
-
-static void log_fade_brightness_if_changed(
-    uint8_t strip_index,
-    LedStripScene scene,
-    uint8_t brightness,
-    uint32_t elapsed_ms,
-    uint32_t now_ms) {
-  if (strip_index != 0) return;
-
-  if (elapsed_ms > kLedFadeDurationMs) {
-    s_fade_log_has_prev = false;
-    return;
-  }
-
-  if (s_fade_log_has_prev && elapsed_ms < s_fade_log_prev_elapsed_ms) {
-    Serial.print("fade strip=0 *** timeline reset detected *** prev_elapsed_ms=");
-    Serial.print(s_fade_log_prev_elapsed_ms);
-    Serial.print(" elapsed_ms=");
-    Serial.print(elapsed_ms);
-    Serial.print(" time_ms=");
-    Serial.println(now_ms);
-  }
-
-  const uint32_t log_delta_ms = s_fade_log_has_prev ? (now_ms - s_fade_log_prev_time_ms) : 0;
-  Serial.print("fade strip=0 scene=");
-  Serial.print(scene == LEDSCENE_FADE_IN_3S ? "fade_in_3s" : "fade_out_3s");
-  Serial.print(" brightness=");
-  Serial.print(brightness);
-  Serial.print(" elapsed_ms=");
-  Serial.print(elapsed_ms);
-  Serial.print(" log_delta_ms=");
-  Serial.print(log_delta_ms);
-  Serial.print(" time_ms=");
-  Serial.println(now_ms);
-
-  s_fade_log_has_prev = true;
-  s_fade_log_prev_brightness = brightness;
-  s_fade_log_prev_time_ms = now_ms;
-  s_fade_log_prev_elapsed_ms = elapsed_ms;
-}
 
 static void paint_strip_fade_in_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const float timePhase = fade_wave_phase(elapsed_ms, kLedFadeDurationMs);
-  const uint8_t brightness = wave_to_byte(sinf(timePhase));
-  log_fade_brightness_if_changed(strip_index, LEDSCENE_FADE_IN_3S, brightness, elapsed_ms, now_ms);
+  const uint8_t brightness = smoothstep_progress_8(elapsed_ms, kLedFadeDurationMs);
   paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
 static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const float timePhase = fade_wave_phase(elapsed_ms, kLedFadeDurationMs);
-  const uint8_t brightness = wave_to_byte(cosf(timePhase));
-  log_fade_brightness_if_changed(strip_index, LEDSCENE_FADE_OUT_3S, brightness, elapsed_ms, now_ms);
+  const uint8_t brightness = (uint8_t)(255 - smoothstep_progress_8(elapsed_ms, kLedFadeDurationMs));
   paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
