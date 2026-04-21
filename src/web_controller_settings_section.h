@@ -1,5 +1,7 @@
 R"HTML(
-<div class='box'><h2>Controller Settings</h2>
+<div class='box'>
+<details>
+<summary>Controller Settings</summary>
 <form method='POST' action='/save-control'>
 <label>TMC run current (mA)</label>
 <input name='tmc_run_current_ma' type='number' min='1' max='2000' value='{{TMC_RUN_CURRENT_MA}}'>
@@ -11,12 +13,10 @@ R"HTML(
 <input name='move_accel_steps_per_sec2' type='number' min='1' value='{{MOVE_ACCEL_STEPS_PER_SEC2}}'>
 <label>Button zero steps (mute equivalent)</label>
 <input name='btn_zero_steps' type='number' value='{{BTN_ZERO_STEPS}}'>
-<label>LED brightness (%)</label>
-<input id='led-brightness-input' name='led_global_brightness_pct' type='number' min='0' max='100' value='{{LED_GLOBAL_BRIGHTNESS_PCT}}'>
-<input id='led-brightness-slider' type='range' min='0' max='100' value='{{LED_GLOBAL_BRIGHTNESS_PCT}}'>
-<p class='small'>スライダー/数値入力はリアルタイム反映されます。SaveでNVSに保存します。</p>
 {{BTN_RELATIVE_ROWS}}
 <p class='small'>INFOやserial/IRで更新可能な値をここから書き換えできます。保存時にNVSへ永続化します。</p>
 <button type='submit'>Save Controller Settings</button>
-</form></div>
+</form>
+</details>
+</div>
 )HTML"
