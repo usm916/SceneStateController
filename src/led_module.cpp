@@ -2,7 +2,6 @@
 #include "config.h"
 #include <Arduino.h>
 #include <FastLED.h>
-#include <math.h>
 #include <Preferences.h>
 
 static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
@@ -258,32 +257,26 @@ static void paint_strip_random_long_blink_then_on(uint8_t strip_index, const CRG
   }
 }
 
+static uint8_t smoothstep_progress_8(uint32_t elapsed_ms, uint32_t duration_ms) {
+  if (elapsed_ms >= duration_ms) return 255;
+  const uint32_t t_q10 = (elapsed_ms * 1024UL) / duration_ms;  // 0..1023
+  const uint32_t t2_q10 = (t_q10 * t_q10) >> 10;
+  const uint32_t t3_q10 = (t2_q10 * t_q10) >> 10;
+  const uint32_t eased_q10 = (3UL * t2_q10) - (2UL * t3_q10);  // smoothstep
+  return (uint8_t)((eased_q10 * 255UL + 511UL) / 1023UL);
+}
+
 static constexpr uint32_t kLedFadeDurationMs = 5000UL;
-
-static uint8_t wave_to_byte(float wave) {
-  float normalized = (wave + 1.0f) * 0.5f;
-  if (normalized < 0.0f) normalized = 0.0f;
-  if (normalized > 1.0f) normalized = 1.0f;
-  return (uint8_t)(normalized * 255.0f);
-}
-
-static float fade_wave_phase(uint32_t elapsed_ms, uint32_t duration_ms) {
-  if (duration_ms == 0) return 0.0f;
-  const uint32_t cycle_pos_ms = elapsed_ms % duration_ms;
-  return (2.0f * PI * (float)cycle_pos_ms) / (float)duration_ms;
-}
 
 static void paint_strip_fade_in_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const float timePhase = fade_wave_phase(elapsed_ms, kLedFadeDurationMs);
-  const uint8_t brightness = wave_to_byte(sinf(timePhase));
+  const uint8_t brightness = smoothstep_progress_8(elapsed_ms, kLedFadeDurationMs);
   paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
 static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const float timePhase = fade_wave_phase(elapsed_ms, kLedFadeDurationMs);
-  const uint8_t brightness = wave_to_byte(cosf(timePhase));
+  const uint8_t brightness = (uint8_t)(255 - smoothstep_progress_8(elapsed_ms, kLedFadeDurationMs));
   paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
