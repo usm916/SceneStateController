@@ -47,7 +47,7 @@ If you want endstops without internal pull-up:
 
 前提:
 - ESP-NOW Link の role が `MANAGER` のときのみ、LEDノードへ転送されます。
-- 受信側（LED NODE）では `CMD_SET_UPDATES / CMD_SET_BRIGHTNESS / CMD_SET_PATTERN / CMD_SET_STRIP_SCENE / CMD_SET_ALL_SCENE` を適用します。
+- 受信側（LED NODE）では `CMD_SET_BRIGHTNESS / CMD_SET_PATTERN / CMD_SET_STRIP_SCENE / CMD_SET_ALL_SCENE` を適用します（`CMD_SET_UPDATES` は互換目的で残存、実質非推奨）。
 
 ### Serialコマンド（USB/PIシリアル入力）
 - `LED <pattern>`
@@ -65,9 +65,6 @@ If you want endstops without internal pull-up:
 
 ### HTTP API（`POST /led-control`）
 次のパラメータは単独で解釈され、該当操作がLEDノードへパススルーされます。
-
-- `update_enabled=0|1`
-  - 動作: LED更新ループのON/OFF。MANAGER時は `SET_UPDATES` を送信。
 
 - `brightness_pct=<0..100>`
   - 動作: 全体輝度更新。MANAGER時は `SET_BRIGHTNESS` を送信。

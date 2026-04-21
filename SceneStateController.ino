@@ -162,7 +162,7 @@ void setup() {
   }
   s_runtime_mode = startup_mode;
   ensure_modules_for_mode(s_runtime_mode);
-  led_set_updates_enabled(false);
+  led_set_updates_enabled(true);
   s_log.print_startup(s_runtime_mode);
   Serial.print("FastLED RMT status: ");
   Serial.println(led_rmt_status_text());
