@@ -27,6 +27,8 @@ static constexpr const char* kEspnowRoleKey = "esp_role";
 static constexpr const char* kEspnowChannelKey = "esp_channel";
 static constexpr const char* kEspnowPeerMacKey = "esp_peer_mac";
 static constexpr const char* kSelfStaMacKey = "self_sta_mac";
+static constexpr uint32_t kStripSceneCooldownMs = 500;
+static uint32_t s_lastStripSceneRequestMs = 0;
 
 // ------------------------------------------------------------
 // public
@@ -685,6 +687,14 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
                   "scene must be SOLID/CHASE/BLINK/RANDOM/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
     return;
   }
+
+  const uint32_t nowMs = millis();
+  if (s_lastStripSceneRequestMs != 0 &&
+      (uint32_t)(nowMs - s_lastStripSceneRequestMs) < kStripSceneCooldownMs) {
+    request->send(429, "text/plain; charset=utf-8", "strip scene cooldown active (500ms)");
+    return;
+  }
+  s_lastStripSceneRequestMs = nowMs;
 
   if (applyAllStrips) {
     for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {

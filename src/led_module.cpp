@@ -229,7 +229,6 @@ void led_set_pattern(LedPattern p, bool force_reset) {
 
 void led_set_strip_scene(uint8_t strip_index, LedStripScene scene) {
   if (strip_index >= SSC_LED_ACTIVE_STRIP_COUNT) return;
-  if (s_strip_scenes[strip_index] == scene) return;
   s_strip_scenes[strip_index] = scene;
   s_chase_pos[strip_index] = 0;
   s_scene_start_ms[strip_index] = millis();
