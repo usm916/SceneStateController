@@ -263,15 +263,17 @@ static uint8_t smoothstep_progress_8(uint32_t elapsed_ms, uint32_t duration_ms) 
   return (uint8_t)((eased_q10 * 255UL + 511UL) / 1023UL);
 }
 
+static constexpr uint32_t kLedFadeDurationMs = 5000UL;
+
 static void paint_strip_fade_in_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const uint8_t brightness = smoothstep_progress_8(elapsed_ms, 3000UL);
+  const uint8_t brightness = smoothstep_progress_8(elapsed_ms, kLedFadeDurationMs);
   paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
 static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
-  const uint8_t brightness = (uint8_t)(255 - smoothstep_progress_8(elapsed_ms, 3000UL));
+  const uint8_t brightness = (uint8_t)(255 - smoothstep_progress_8(elapsed_ms, kLedFadeDurationMs));
   paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
