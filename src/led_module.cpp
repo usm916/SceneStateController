@@ -59,6 +59,10 @@ static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] 
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
 static uint32_t s_crash_next_toggle_ms[SSC_LED_STRIP_COUNT] = {0};
 static bool s_crash_on[SSC_LED_STRIP_COUNT] = {false};
+static bool s_fade_log_has_prev = false;
+static uint8_t s_fade_log_prev_brightness = 0;
+static LedStripScene s_fade_log_prev_scene = LEDSCENE_SOLID;
+static uint32_t s_led_tick_delta_ms = 0;
 
 static CRGB strip_base_color(uint8_t strip_index) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return CRGB(16, 16, 16);
@@ -265,15 +269,37 @@ static uint8_t smoothstep_progress_8(uint32_t elapsed_ms, uint32_t duration_ms) 
 
 static constexpr uint32_t kLedFadeDurationMs = 5000UL;
 
+static void log_fade_brightness_if_changed(uint8_t strip_index, LedStripScene scene, uint8_t brightness, uint32_t now_ms) {
+  if (strip_index != 0) return;
+
+  const bool scene_changed = (!s_fade_log_has_prev || s_fade_log_prev_scene != scene);
+  if (scene_changed || s_fade_log_prev_brightness != brightness) {
+    Serial.print("fade strip=0 scene=");
+    Serial.print(scene == LEDSCENE_FADE_IN_3S ? "fade_in_3s" : "fade_out_3s");
+    Serial.print(" brightness=");
+    Serial.print(brightness);
+    Serial.print(" loop_delta_ms=");
+    Serial.print(s_led_tick_delta_ms);
+    Serial.print(" time_ms=");
+    Serial.println(now_ms);
+
+    s_fade_log_has_prev = true;
+    s_fade_log_prev_scene = scene;
+    s_fade_log_prev_brightness = brightness;
+  }
+}
+
 static void paint_strip_fade_in_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
   const uint8_t brightness = smoothstep_progress_8(elapsed_ms, kLedFadeDurationMs);
+  log_fade_brightness_if_changed(strip_index, LEDSCENE_FADE_IN_3S, brightness, now_ms);
   paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
 static void paint_strip_fade_out_3s(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
   const uint32_t elapsed_ms = now_ms - s_scene_start_ms[strip_index];
   const uint8_t brightness = (uint8_t)(255 - smoothstep_progress_8(elapsed_ms, kLedFadeDurationMs));
+  log_fade_brightness_if_changed(strip_index, LEDSCENE_FADE_OUT_3S, brightness, now_ms);
   paint_strip_solid(strip_index, apply_brightness_linear(base, brightness));
 }
 
@@ -355,6 +381,10 @@ void led_tick(uint32_t now_ms) {
   }
   s_last_ms += interval_ms;
   if ((now_ms - s_last_ms) >= interval_ms) s_last_ms = now_ms;
+
+  static uint32_t s_prev_led_tick_ms = 0;
+  s_led_tick_delta_ms = (s_prev_led_tick_ms == 0) ? 0 : (now_ms - s_prev_led_tick_ms);
+  s_prev_led_tick_ms = now_ms;
 
   if (s_pattern == LEDP_ERROR || s_pattern == LEDP_ARRIVED || has_blink_scene_active()) {
     const uint32_t blink_interval_ms = (s_pattern == LEDP_ERROR) ? 200UL : 50UL;
