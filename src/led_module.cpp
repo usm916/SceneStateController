@@ -5,14 +5,18 @@
 #include <math.h>
 #include <Preferences.h>
 
-static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
+static_assert(SSC_LED_STRIP_COUNT == 7, "This firmware currently assumes exactly 7 LED strips.");
 static_assert(SSC_LED_TARGET_FPS > 0, "SSC_LED_TARGET_FPS must be greater than 0.");
+static_assert(SSC_LED_ACTIVE_STRIP_COUNT > 0, "SSC_LED_ACTIVE_STRIP_COUNT must be greater than 0.");
+static_assert(SSC_LED_ACTIVE_STRIP_COUNT <= SSC_LED_STRIP_COUNT,
+              "SSC_LED_ACTIVE_STRIP_COUNT must be <= SSC_LED_STRIP_COUNT.");
 
 static CRGB s_leds[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN];
 static LedPattern s_pattern = LEDP_IDLE;
 static LedStripScene s_strip_scenes[SSC_LED_STRIP_COUNT];
 
 static constexpr LedStripScene kIdleScenes[SSC_LED_STRIP_COUNT] = {
+  LEDSCENE_SOLID,
   LEDSCENE_SOLID,
   LEDSCENE_SOLID,
   LEDSCENE_SOLID,
@@ -28,6 +32,7 @@ static constexpr LedStripScene kMovingScenes[SSC_LED_STRIP_COUNT] = {
   LEDSCENE_CHASE,
   LEDSCENE_CHASE,
   LEDSCENE_CHASE,
+  LEDSCENE_CHASE,
 };
 
 static constexpr LedStripScene kArrivedScenes[SSC_LED_STRIP_COUNT] = {
@@ -37,9 +42,11 @@ static constexpr LedStripScene kArrivedScenes[SSC_LED_STRIP_COUNT] = {
   LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
   LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
   LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
+  LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
 };
 
 static constexpr LedStripScene kErrorScenes[SSC_LED_STRIP_COUNT] = {
+  LEDSCENE_BLINK,
   LEDSCENE_BLINK,
   LEDSCENE_BLINK,
   LEDSCENE_BLINK,
@@ -108,6 +115,9 @@ static void add_strip_controller(uint8_t strip_index) {
     case 5:
       FastLED.addLeds<WS2812B, SSC_PIN_WS2812B_5, GRB>(s_leds[5], SSC_LED_STRIP_LEN);
       break;
+    case 6:
+      FastLED.addLeds<WS2812B, SSC_PIN_WS2812B_6, GRB>(s_leds[6], SSC_LED_STRIP_LEN);
+      break;
     default:
       break;
   }
@@ -117,7 +127,7 @@ void led_setup() {
   randomSeed(micros());
   led_load_saved_brightness();
 
-  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+  for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
     s_strip_scenes[strip] = LEDSCENE_SOLID;
     s_chase_pos[strip] = 0;
@@ -173,7 +183,7 @@ bool led_updates_enabled() {
 
 static void apply_scene_profile(const LedStripScene* profile) {
   const uint32_t now_ms = millis();
-  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+  for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     s_strip_scenes[strip] = profile[strip];
     s_chase_pos[strip] = 0;
     s_scene_start_ms[strip] = now_ms;
@@ -211,7 +221,7 @@ void led_set_pattern(LedPattern p, bool force_reset) {
 }
 
 void led_set_strip_scene(uint8_t strip_index, LedStripScene scene) {
-  if (strip_index >= SSC_LED_STRIP_COUNT) return;
+  if (strip_index >= SSC_LED_ACTIVE_STRIP_COUNT) return;
   if (s_strip_scenes[strip_index] == scene) return;
   s_strip_scenes[strip_index] = scene;
   s_chase_pos[strip_index] = 0;
@@ -389,7 +399,7 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
 }
 
 static bool has_blink_scene_active() {
-  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+  for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     if (s_strip_scenes[strip] == LEDSCENE_BLINK) return true;
   }
   return false;
@@ -419,7 +429,7 @@ void led_tick(uint32_t now_ms) {
     s_blink_on = true;
   }
 
-  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+  for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     render_strip(strip, now_ms);
   }
 

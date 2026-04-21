@@ -9,6 +9,7 @@
 #define SSC_PIN_WS2812B_3     22
 #define SSC_PIN_WS2812B_4     32
 #define SSC_PIN_WS2812B_5     33
+#define SSC_PIN_WS2812B_6     4
 
 #define SSC_PIN_STEP          26
 #define SSC_PIN_DIR           27
@@ -28,11 +29,15 @@
 // #define SSC_TMC_UART_PIN      17
 // #define SSC_TMC_UART_BAUD     115200
 
-#define SSC_LED_STRIP_COUNT   6
+#define SSC_LED_STRIP_COUNT   7
 #define SSC_LED_STRIP_LEN     72
-#define SSC_LED_BRIGHTNESS    64
+#define SSC_LED_BRIGHTNESS    255
 #ifndef SSC_LED_TARGET_FPS
 #define SSC_LED_TARGET_FPS    60
+#endif
+
+#ifndef SSC_LED_ACTIVE_STRIP_COUNT
+#define SSC_LED_ACTIVE_STRIP_COUNT 1
 #endif
 
 #define SSC_STEPS_PER_FLOOR   25600
@@ -123,6 +128,7 @@ constexpr SscRgbColor SSC_LED_STRIP_BASE_COLORS[SSC_LED_STRIP_COUNT] = {
   {56, 48, 32},  // strip 3 (warm amber-ish white)
   {48, 32, 56},  // strip 4 (violet-ish white)
   {32, 52, 52},  // strip 5 (cyan-ish white)
+  {56, 56, 32},  // strip 6 (warm yellow-ish white)
 };
 static_assert(sizeof(SSC_LED_STRIP_BASE_COLORS) / sizeof(SSC_LED_STRIP_BASE_COLORS[0]) == SSC_LED_STRIP_COUNT,
               "SSC_LED_STRIP_BASE_COLORS count mismatch");
