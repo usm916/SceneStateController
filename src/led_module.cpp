@@ -402,10 +402,6 @@ void led_tick(uint32_t now_ms) {
   s_last_ms += interval_ms;
   if ((now_ms - s_last_ms) >= interval_ms) s_last_ms = now_ms;
 
-  static uint32_t s_prev_led_tick_ms = 0;
-  s_led_tick_delta_ms = (s_prev_led_tick_ms == 0) ? 0 : (now_ms - s_prev_led_tick_ms);
-  s_prev_led_tick_ms = now_ms;
-
   if (s_pattern == LEDP_ERROR || s_pattern == LEDP_ARRIVED || has_blink_scene_active()) {
     const uint32_t blink_interval_ms = (s_pattern == LEDP_ERROR) ? 200UL : 50UL;
     if (s_blink_last_toggle_ms == 0 || (now_ms - s_blink_last_toggle_ms) >= blink_interval_ms) {
