@@ -54,7 +54,7 @@ void ConsoleLogger::print_mode_usage() {
   out_.println("Scene cmd: SCENE <IDLE|MOVE|ARRIVED|ERROR>");
   out_.println("Brightness cmd: brightness_<0..100>");
   out_.println("Manual prev/next max speed follows speed_<steps/s>");
-  out_.print("Loop frame us (min/max/recent10)=");
+  out_.print("Loop frame us (min/max/recent20)=");
   out_.print(frame_timing_min_us());
   out_.print("/");
   out_.print(frame_timing_max_us());

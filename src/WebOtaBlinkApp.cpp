@@ -1260,7 +1260,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<div>Loop frame max (us)</div><div class='mono'>";
   html += String(frame_timing_max_us());
   html += "</div>";
-  html += "<div>Loop frame recent10 (us)</div><div class='mono'>[";
+  html += "<div>Loop frame recent20 (us)</div><div class='mono'>[";
   const uint8_t recentCount = frame_timing_recent_count();
   for (uint8_t i = 0; i < recentCount; ++i) {
     if (i > 0) html += ",";

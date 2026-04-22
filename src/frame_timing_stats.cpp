@@ -1,7 +1,7 @@
 #include "frame_timing_stats.h"
 
 namespace {
-constexpr uint8_t kFrameWindowSize = 10;
+constexpr uint8_t kFrameWindowSize = 20;
 
 uint32_t s_prev_now_us = 0;
 bool s_prev_initialized = false;
