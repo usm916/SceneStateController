@@ -1,6 +1,12 @@
 #pragma once
 #include <stdint.h>
 
+struct LedPoint {
+  uint8_t x;
+  uint8_t y;
+  uint8_t val;
+};
+
 enum LedPattern : uint8_t {
   LEDP_IDLE = 0,
   LEDP_MOVING,
@@ -31,3 +37,5 @@ void led_set_updates_enabled(bool enabled);
 bool led_updates_enabled();
 void led_tick(uint32_t now_ms);
 const char* led_rmt_status_text();
+const LedPoint* led_points(uint8_t strip_index, uint16_t* out_count);
+bool led_point_brightness(uint8_t strip_index, uint16_t point_index, uint8_t* out_brightness);
