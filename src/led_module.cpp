@@ -5,12 +5,15 @@
 #include <Preferences.h>
 
 static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly 6 LED strips.");
+static_assert(SSC_LED_STRIP_COUNT <= 255, "LedPoint.y must fit in uint8_t.");
+static_assert(SSC_LED_STRIP_LEN <= 255, "LedPoint.x must fit in uint8_t.");
 static_assert(SSC_LED_TARGET_FPS > 0, "SSC_LED_TARGET_FPS must be greater than 0.");
 static_assert(SSC_LED_ACTIVE_STRIP_COUNT > 0, "SSC_LED_ACTIVE_STRIP_COUNT must be greater than 0.");
 static_assert(SSC_LED_ACTIVE_STRIP_COUNT <= SSC_LED_STRIP_COUNT,
               "SSC_LED_ACTIVE_STRIP_COUNT must be <= SSC_LED_STRIP_COUNT.");
 
 static CRGB s_leds[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN];
+static LedPoint s_led_points[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN];
 static LedPattern s_pattern = LEDP_IDLE;
 static LedStripScene s_strip_scenes[SSC_LED_STRIP_COUNT];
 
@@ -104,6 +107,17 @@ static uint8_t to_fastled_master_brightness(uint8_t brightness_pct) {
   return (uint8_t)scaled;
 }
 
+static uint8_t led_value_from_color(const CRGB& c) {
+  return max(c.r, max(c.g, c.b));
+}
+
+static void sync_point_values_for_strip(uint8_t strip_index) {
+  if (strip_index >= SSC_LED_STRIP_COUNT) return;
+  for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
+    s_led_points[strip_index][i].val = led_value_from_color(s_leds[strip_index][i]);
+  }
+}
+
 static void add_strip_controller(uint8_t strip_index) {
   switch (strip_index) {
     case 0:
@@ -144,6 +158,9 @@ void led_setup() {
   for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
     for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
       s_leds[strip][i] = CRGB::Black;
+      s_led_points[strip][i].x = (uint8_t)i;
+      s_led_points[strip][i].y = strip;
+      s_led_points[strip][i].val = 0;
     }
   }
   FastLED.show();
@@ -352,6 +369,7 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
       paint_strip_solid(strip_index, apply_brightness(base, 255));
       break;
   }
+  sync_point_values_for_strip(strip_index);
 }
 
 static bool has_blink_scene_active() {
@@ -403,4 +421,19 @@ const char* led_rmt_status_text() {
 #else
   return "n/a (non-ESP32 build)";
 #endif
+}
+
+const LedPoint* led_points(uint8_t strip_index, uint16_t* out_count) {
+  if (out_count != nullptr) *out_count = 0;
+  if (strip_index >= SSC_LED_STRIP_COUNT) return nullptr;
+  if (out_count != nullptr) *out_count = SSC_LED_STRIP_LEN;
+  return s_led_points[strip_index];
+}
+
+bool led_point_brightness(uint8_t strip_index, uint16_t point_index, uint8_t* out_brightness) {
+  if (out_brightness == nullptr) return false;
+  if (strip_index >= SSC_LED_STRIP_COUNT) return false;
+  if (point_index >= SSC_LED_STRIP_LEN) return false;
+  *out_brightness = s_led_points[strip_index][point_index].val;
+  return true;
 }
