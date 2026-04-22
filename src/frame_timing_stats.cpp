@@ -48,13 +48,15 @@ uint32_t frame_timing_max_us() {
   return s_max_frame_us;
 }
 
-uint32_t frame_timing_avg_last_10_us() {
-  if (s_recent_frame_count == 0) return 0;
+uint8_t frame_timing_recent_count() {
+  return s_recent_frame_count;
+}
 
-  uint32_t sum = 0;
-  for (uint8_t i = 0; i < s_recent_frame_count; ++i) {
-    sum += s_recent_frames_us[i];
-  }
+uint32_t frame_timing_recent_us(uint8_t index_from_oldest) {
+  if (index_from_oldest >= s_recent_frame_count) return 0;
 
-  return sum / s_recent_frame_count;
+  const uint8_t oldest_index =
+      (uint8_t)((s_recent_frame_next + kFrameWindowSize - s_recent_frame_count) % kFrameWindowSize);
+  const uint8_t idx = (uint8_t)((oldest_index + index_from_oldest) % kFrameWindowSize);
+  return s_recent_frames_us[idx];
 }

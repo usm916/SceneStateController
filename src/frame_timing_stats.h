@@ -6,6 +6,7 @@
 void frame_timing_on_loop(uint32_t now_us);
 uint32_t frame_timing_min_us();
 uint32_t frame_timing_max_us();
-uint32_t frame_timing_avg_last_10_us();
+uint8_t frame_timing_recent_count();
+uint32_t frame_timing_recent_us(uint8_t index_from_oldest);
 
 #endif
