@@ -1254,14 +1254,14 @@ String WebOtaBlinkApp::makeHtml() const
   html += customMacText();
   html += "</div>";
 
-  html += "<div>Loop frame min (ms)</div><div class='mono'>";
-  html += String(frame_timing_min_ms());
+  html += "<div>Loop frame min (us)</div><div class='mono'>";
+  html += String(frame_timing_min_us());
   html += "</div>";
-  html += "<div>Loop frame max (ms)</div><div class='mono'>";
-  html += String(frame_timing_max_ms());
+  html += "<div>Loop frame max (us)</div><div class='mono'>";
+  html += String(frame_timing_max_us());
   html += "</div>";
-  html += "<div>Loop frame avg10 (ms)</div><div class='mono'>";
-  html += String(frame_timing_avg_last_10_ms());
+  html += "<div>Loop frame avg10 (us)</div><div class='mono'>";
+  html += String(frame_timing_avg_last_10_us());
   html += "</div>";
   html += "</div></details></div>";
 

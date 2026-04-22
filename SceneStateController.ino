@@ -172,7 +172,7 @@ void loop() {
   app.loop();
 
   uint32_t now_ms = millis();
-  frame_timing_on_loop(now_ms);
+  frame_timing_on_loop(micros());
   shared_serial_pump();
   espnow_link_poll();
   Event serial_event = {EVT_NONE, 0, {}};
