@@ -396,8 +396,10 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
   }
   if (len >= sizeof(s_serial_line) - 1) {
     log.print_mode_cmd_too_long();
+    log.print_unrecognized_line(line);
     return false;
   }
+  log.print_unrecognized_line(line);
   log.print_mode_usage();
   return false;
 }

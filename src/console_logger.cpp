@@ -71,6 +71,15 @@ void ConsoleLogger::print_mode_cmd_too_long() {
   out_.println("MODE_CMD too long");
 }
 
+void ConsoleLogger::print_unrecognized_line(const char* line) {
+  out_.print("UNRECOGNIZED RAW: ");
+  if (line == nullptr) {
+    out_.println("<null>");
+    return;
+  }
+  out_.println(line);
+}
+
 void ConsoleLogger::print_startup(uint8_t mode) {
   out_.print("INITIAL MODE=");
   out_.println(mode);
