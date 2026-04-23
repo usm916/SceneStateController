@@ -13,6 +13,12 @@
 #define SSC_PIN_STEP          26
 #define SSC_PIN_DIR           27
 #define SSC_PIN_EN            14
+// TMC2209 UART (added for UART switch)
+#define SSC_TMC_UART_BAUD 115200
+#define SSC_TMC_UART_ONEWIRE  0
+#define SSC_TMC_UART_ONEWIRE_PIN  17
+#define SSC_TMC_UART_RX_PIN  16
+#define SSC_TMC_UART_TX_PIN  17
 
 #define SSC_PIN_ENDSTOP_UP    25
 #define SSC_PIN_ENDSTOP_DOWN  13
@@ -70,14 +76,6 @@
 #ifndef SSC_ESPNOW_LINK_PEER_MAC
 #define SSC_ESPNOW_LINK_PEER_MAC {0x24, 0x6F, 0x28, 0x00, 0x00, 0x01}
 #endif
-
-
-// TMC2209 UART (added for UART switch)
-#define SSC_TMC_UART_BAUD 115200
-#define SSC_TMC_UART_ONEWIRE  0
-#define SSC_TMC_UART_ONEWIRE_PIN  17
-#define SSC_TMC_UART_RX_PIN  16
-#define SSC_TMC_UART_TX_PIN  17
 
 #define SSC_TMC_MOTOR_CURRENT_MA 1000
 #define SSC_TMC_HOLD_CURRENT_PCT 60
