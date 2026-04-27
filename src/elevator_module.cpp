@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "shared_serial.h"
+#include "tmc2209_module.h"
 
 #include <AccelStepper.h>
 #include <Arduino.h>
@@ -62,6 +63,8 @@ uint32_t s_motor_lag_accumulated_ms = 0;
 uint32_t s_motor_lag_last_warn_ms = 0;
 float s_move_max_speed = kMoveMaxSpeedDefault;
 float s_move_acceleration = kMoveAccelerationDefault;
+uint16_t s_motor_run_current_ma = SSC_TMC_MOTOR_CURRENT_MA;
+uint8_t s_motor_hold_current_pct = SSC_TMC_HOLD_CURRENT_PCT;
 
 struct HomingSession {
   bool active = false;
@@ -105,6 +108,22 @@ bool endstop_hit_down() {
 
 bool active_homing_switch_hit() {
   return s_homing.toward_top ? endstop_hit_up() : endstop_hit_down();
+}
+
+uint16_t clamp_motor_run_current_ma(uint16_t current_ma) {
+  if (current_ma < 1) return 1;
+  if (current_ma > 2000) return 2000;
+  return current_ma;
+}
+
+uint8_t clamp_motor_hold_current_pct(uint8_t hold_pct) {
+  return (hold_pct > 100) ? 100 : hold_pct;
+}
+
+void apply_motor_current_settings() {
+  s_motor_run_current_ma = clamp_motor_run_current_ma(s_motor_run_current_ma);
+  s_motor_hold_current_pct = clamp_motor_hold_current_pct(s_motor_hold_current_pct);
+  s_driver.rms_current(s_motor_run_current_ma, s_motor_hold_current_pct);
 }
 
 void zero_at_bottom_endstop() {
@@ -379,12 +398,16 @@ void elevator_setup() {
   pinMode(SSC_PIN_EN, OUTPUT);
   digitalWrite(SSC_PIN_EN, LOW);
 
+  tmc2209_setup();
+  s_motor_run_current_ma = tmc2209_run_current_ma();
+  s_motor_hold_current_pct = tmc2209_hold_current_pct();
+
   s_driver.begin();
   s_driver.pdn_disable(true);
   s_driver.I_scale_analog(false);
   s_driver.toff(SSC_TMC_TOFF);
   s_driver.blank_time(SSC_TMC_BLANK_TIME);
-  s_driver.rms_current(SSC_TMC_MOTOR_CURRENT_MA, SSC_TMC_HOLD_CURRENT_MULT);
+  apply_motor_current_settings();
   s_driver.microsteps(SSC_TMC_MICROSTEPS);
   s_driver.en_spreadCycle(SSC_TMC_ENABLE_SPREADCYCLE != 0);
   s_driver.TPWMTHRS(SSC_TMC_TPWMTHRS);
@@ -451,6 +474,24 @@ float elevator_move_max_speed() {
 
 float elevator_move_acceleration() {
   return s_move_acceleration;
+}
+
+void elevator_set_motor_run_current_ma(uint16_t current_ma) {
+  s_motor_run_current_ma = clamp_motor_run_current_ma(current_ma);
+  apply_motor_current_settings();
+}
+
+void elevator_set_motor_hold_current_pct(uint8_t hold_pct) {
+  s_motor_hold_current_pct = clamp_motor_hold_current_pct(hold_pct);
+  apply_motor_current_settings();
+}
+
+uint16_t elevator_motor_run_current_ma() {
+  return s_motor_run_current_ma;
+}
+
+uint8_t elevator_motor_hold_current_pct() {
+  return s_motor_hold_current_pct;
 }
 
 bool elevator_save_motion_profile() {

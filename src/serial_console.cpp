@@ -278,6 +278,7 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     int32_t current_ma = 0;
     if (parse_int(line + 8, current_ma) && current_ma > 0 && current_ma <= 2000) {
       tmc2209_set_run_current_ma((uint16_t)current_ma);
+      elevator_set_motor_run_current_ma((uint16_t)current_ma);
       Serial.print("TMC run_current(mA)=");
       Serial.println(tmc2209_run_current_ma());
       return false;
@@ -287,6 +288,7 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     int32_t hold_pct = 0;
     if (parse_int(line + 9, hold_pct) && hold_pct >= 0 && hold_pct <= 100) {
       tmc2209_set_hold_current_pct((uint8_t)hold_pct);
+      elevator_set_motor_hold_current_pct((uint8_t)hold_pct);
       Serial.print("TMC hold_current(%)=");
       Serial.println(tmc2209_hold_current_pct());
       return false;
@@ -328,6 +330,7 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     int32_t current_ma = 0;
     if (parse_int(line + 8, current_ma) && current_ma > 0 && current_ma <= 2000) {
       tmc2209_set_run_current_ma((uint16_t)current_ma);
+      elevator_set_motor_run_current_ma((uint16_t)current_ma);
       (void)tmc2209_save_current_settings();
       Serial.print("current_");
       Serial.println(tmc2209_run_current_ma());

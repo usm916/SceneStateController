@@ -470,6 +470,7 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     if (runCurrentMa >= 1 && runCurrentMa <= 2000)
     {
       tmc2209_set_run_current_ma((uint16_t)runCurrentMa);
+      elevator_set_motor_run_current_ma((uint16_t)runCurrentMa);
       updated = true;
     }
   }
@@ -480,6 +481,7 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     if (holdCurrentPct >= 0 && holdCurrentPct <= 100)
     {
       tmc2209_set_hold_current_pct((uint8_t)holdCurrentPct);
+      elevator_set_motor_hold_current_pct((uint8_t)holdCurrentPct);
       updated = true;
     }
   }
