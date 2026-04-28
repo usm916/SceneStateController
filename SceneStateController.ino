@@ -10,6 +10,7 @@
 #include "src/ir_module.h"
 #include "src/led_module.h"
 #include "src/pi_link.h"
+#include "src/physical_button_input.h"
 #include "src/serial_console.h"
 #include "src/scene_controller.h"
 #include "src/console_logger.h"
@@ -51,10 +52,20 @@ static uint16_t calc_ramp_up_speed(uint32_t now_ms);
 static uint16_t calc_ramp_down_speed(uint32_t now_ms);
 static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
 static uint16_t manual_spin_speed_cap();
+static void apply_all_strip_scene(LedStripScene scene);
 
 static uint16_t manual_spin_speed_cap() {
   const float move_speed_f = elevator_move_max_speed();
   return (move_speed_f > 0.0f) ? (uint16_t)move_speed_f : 1;
+}
+
+static void apply_all_strip_scene(LedStripScene scene) {
+  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; strip++) {
+    led_set_strip_scene(strip, scene);
+  }
+  if (espnow_link_is_manager()) {
+    (void)espnow_link_send_all_scene(scene);
+  }
 }
 
 static void apply_led_override(uint8_t pattern_id) {
@@ -162,6 +173,7 @@ void setup() {
   }
   s_runtime_mode = startup_mode;
   ensure_modules_for_mode(s_runtime_mode);
+  physical_button_input_setup();
   led_set_updates_enabled(true);
   s_log.print_startup(s_runtime_mode);
   Serial.print("FastLED RMT status: ");
@@ -199,6 +211,7 @@ void loop() {
   }
 
   if (mode_is(MODE_IR)) {
+    physical_button_input_poll();
     Event e;
     if (ir_poll(e)) {
 #if SSC_IR_LOG_ENABLE
@@ -221,7 +234,7 @@ void loop() {
       const bool floor_btn_pressed = button_position_store_index_from_remote(current_btn, &floor_btn_index);
       const bool control_btn_pressed =
           current_btn == BTN_POWER || current_btn == BTN_EQ || current_btn == BTN_VOL_DOWN || current_btn == BTN_VOL_UP ||
-          current_btn == BTN_MUTE;
+          current_btn == BTN_MUTE || current_btn == BTN_7 || current_btn == BTN_8;
 
       if (floor_btn_pressed && current_btn != s_last_floor_btn) {
         int32_t target_steps = 0;
@@ -253,6 +266,12 @@ void loop() {
         } else if (current_btn == BTN_MUTE) {
           button_position_store_set_zero(elevator_current_position_steps());
           Serial.println("mute: set current position as zero.");
+        } else if (current_btn == BTN_7) {
+          apply_all_strip_scene(LEDSCENE_CRASH);
+          Serial.println("switch: all strips -> CRASH");
+        } else if (current_btn == BTN_8) {
+          apply_all_strip_scene(LEDSCENE_SOLID);
+          Serial.println("switch: all strips -> SOLID");
         }
         s_last_control_btn = current_btn;
         s_manual_spin_dir = 0;
