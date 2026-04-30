@@ -10,11 +10,15 @@
 #include "tmc2209_module.h"
 #include "button_position_store.h"
 #include "espnow_link.h"
+#include "WebOtaBlinkApp.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
+extern WebOtaBlinkApp app;
+
 namespace {
+extern WebOtaBlinkApp app;
 char s_serial_line[64] = {0};
 SharedSerialCursor s_serial_cursor = {0};
 bool s_cursor_initialized = false;
