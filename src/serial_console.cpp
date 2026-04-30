@@ -170,7 +170,9 @@ void print_system_info() {
 }
 
 bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
-                        void (*set_runtime_mode_fn)(uint8_t), Event* out_event) {
+                        void (*set_runtime_mode_fn)(uint8_t),
+                        serial_wifi_slot_setter_t wifi_slot_setter_fn,
+                        Event* out_event) {
   if (len >= 2 && (line[0] == 's' || line[0] == 'S')) {
     int32_t mode_mask = 0;
     if (parse_int(line + 1, mode_mask) && mode_mask >= 0 && mode_mask <= 15) {
@@ -272,6 +274,23 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       return false;
     }
     Serial.println("brightness format: brightness_<0..100>");
+    return false;
+  }
+  if (len >= 8 && (strncmp(line, "WIFI ", 5) == 0 || strncmp(line, "wifi ", 5) == 0)) {
+    int slot = -1;
+    char ssid[33] = {0};
+    char pass[65] = {0};
+    if (sscanf(line + 5, "%d %32s %64s", &slot, ssid, pass) == 3) {
+      if (wifi_slot_setter_fn != nullptr && wifi_slot_setter_fn(slot, ssid, pass)) {
+        Serial.print("wifi slot ");
+        Serial.print(slot);
+        Serial.println(" saved. Reboot to reconnect.");
+        return false;
+      }
+      Serial.println("WIFI slot must be 0..2");
+      return false;
+    }
+    Serial.println("WIFI usage: WIFI <0..2> <ssid> <pass>");
     return false;
   }
   if (len >= 9 && strncmp(line, "TMC RUN ", 8) == 0) {
@@ -408,6 +427,7 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
 
 bool serial_console_poll(ConsoleLogger& log,
                          void (*set_runtime_mode_fn)(uint8_t),
+                         serial_wifi_slot_setter_t wifi_slot_setter_fn,
                          Event* out_event) {
   if (!s_cursor_initialized) {
     shared_serial_cursor_init(&s_serial_cursor);
@@ -419,7 +439,7 @@ bool serial_console_poll(ConsoleLogger& log,
   while (shared_serial_read_line(&s_serial_cursor, s_serial_line, sizeof(s_serial_line))) {
     const uint8_t len = (uint8_t)strlen(s_serial_line);
     const bool has_event =
-        handle_serial_line(log, s_serial_line, len, set_runtime_mode_fn, out_event);
+        handle_serial_line(log, s_serial_line, len, set_runtime_mode_fn, wifi_slot_setter_fn, out_event);
     if (has_event) return true;
   }
 

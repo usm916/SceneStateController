@@ -98,6 +98,21 @@ bool WebOtaBlinkApp::getSavedRuntimeMode(uint8_t* out_mode) const
   return true;
 }
 
+bool WebOtaBlinkApp::setWifiSlot(int slot, const String& ssid, const String& pass)
+{
+  if (slot < 0 || slot >= kMaxWifiSlots)
+  {
+    return false;
+  }
+
+  memset(wifiSlots_[slot].ssid, 0, sizeof(wifiSlots_[slot].ssid));
+  memset(wifiSlots_[slot].pass, 0, sizeof(wifiSlots_[slot].pass));
+  ssid.toCharArray(wifiSlots_[slot].ssid, sizeof(wifiSlots_[slot].ssid));
+  pass.toCharArray(wifiSlots_[slot].pass, sizeof(wifiSlots_[slot].pass));
+  saveSettings();
+  return true;
+}
+
 // ------------------------------------------------------------
 // settings
 // ------------------------------------------------------------

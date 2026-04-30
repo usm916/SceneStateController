@@ -13,6 +13,7 @@ public:
   void begin();
   void loop();
   bool getSavedRuntimeMode(uint8_t* out_mode) const;
+  bool setWifiSlot(int slot, const String& ssid, const String& pass);
 
 private:
   static constexpr int kMaxWifiSlots = 3;
