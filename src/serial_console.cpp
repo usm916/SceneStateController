@@ -10,11 +10,13 @@
 #include "tmc2209_module.h"
 #include "button_position_store.h"
 #include "espnow_link.h"
+#include "WebOtaBlinkApp.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
 namespace {
+extern WebOtaBlinkApp app;
 char s_serial_line[64] = {0};
 SharedSerialCursor s_serial_cursor = {0};
 bool s_cursor_initialized = false;
@@ -272,6 +274,23 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
       return false;
     }
     Serial.println("brightness format: brightness_<0..100>");
+    return false;
+  }
+  if (len >= 8 && (strncmp(line, "WIFI ", 5) == 0 || strncmp(line, "wifi ", 5) == 0)) {
+    int slot = -1;
+    char ssid[33] = {0};
+    char pass[65] = {0};
+    if (sscanf(line + 5, "%d %32s %64s", &slot, ssid, pass) == 3) {
+      if (app.setWifiSlot(slot, String(ssid), String(pass))) {
+        Serial.print("wifi slot ");
+        Serial.print(slot);
+        Serial.println(" saved. Reboot to reconnect.");
+        return false;
+      }
+      Serial.println("WIFI slot must be 0..2");
+      return false;
+    }
+    Serial.println("WIFI usage: WIFI <0..2> <ssid> <pass>");
     return false;
   }
   if (len >= 9 && strncmp(line, "TMC RUN ", 8) == 0) {

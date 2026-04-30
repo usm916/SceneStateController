@@ -53,6 +53,7 @@ void ConsoleLogger::print_mode_usage() {
   out_.println("LED scene cmd: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
   out_.println("Scene cmd: SCENE <IDLE|MOVE|ARRIVED|ERROR>");
   out_.println("Brightness cmd: brightness_<0..100>");
+  out_.println("WiFi cmd: WIFI <0..2> <ssid> <pass>");
   out_.println("Manual prev/next max speed follows speed_<steps/s>");
   out_.print("Loop frame us (min/max/recent20)=");
   out_.print(frame_timing_min_us());
