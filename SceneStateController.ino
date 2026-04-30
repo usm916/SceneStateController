@@ -187,6 +187,10 @@ void setup() {
   uint8_t saved_mode = 0;
   if (app.getSavedRuntimeMode(&saved_mode)) {
     startup_mode = normalize_runtime_mode(saved_mode);
+    if ((startup_mode & MODE_LED) == 0) {
+      startup_mode = MODE_IR;
+      Serial.println("Startup mode fallback: LED runtime flag is off, booting in SWITCH mode (IR only).");
+    }
   }
   s_runtime_mode = startup_mode;
   ensure_modules_for_mode(s_runtime_mode);
