@@ -10,6 +10,42 @@
 #define SSC_PIN_WS2812B_4     32
 #define SSC_PIN_WS2812B_5     33
 
+#define SSC_LED_PIN_MODE_LED    0
+#define SSC_LED_PIN_MODE_SWITCH 1
+
+#ifndef SSC_LED_PIN_MODE
+#define SSC_LED_PIN_MODE SSC_LED_PIN_MODE_LED
+#endif
+
+#ifndef SSC_SWITCH_ACTIVE_LOW
+#define SSC_SWITCH_ACTIVE_LOW 1
+#endif
+
+#ifndef SSC_SWITCH_USE_INPUT_PULLUP
+#define SSC_SWITCH_USE_INPUT_PULLUP 1
+#endif
+
+// RemoteButton code mapping for WS2812B pins when SSC_LED_PIN_MODE_SWITCH is enabled.
+// Defaults: emergency stop, hold-up, hold-down, all CRASH, all SOLID, spare.
+#ifndef SSC_SWITCH_BUTTON_CODE_0
+#define SSC_SWITCH_BUTTON_CODE_0 0x45  // BTN_POWER (emergency stop)
+#endif
+#ifndef SSC_SWITCH_BUTTON_CODE_1
+#define SSC_SWITCH_BUTTON_CODE_1 0x43  // BTN_NEXT (hold up)
+#endif
+#ifndef SSC_SWITCH_BUTTON_CODE_2
+#define SSC_SWITCH_BUTTON_CODE_2 0x40  // BTN_PREV (hold down)
+#endif
+#ifndef SSC_SWITCH_BUTTON_CODE_3
+#define SSC_SWITCH_BUTTON_CODE_3 0x42  // BTN_7 (all strips CRASH)
+#endif
+#ifndef SSC_SWITCH_BUTTON_CODE_4
+#define SSC_SWITCH_BUTTON_CODE_4 0x52  // BTN_8 (all strips SOLID)
+#endif
+#ifndef SSC_SWITCH_BUTTON_CODE_5
+#define SSC_SWITCH_BUTTON_CODE_5 0xFF  // BTN_NONE (spare)
+#endif
+
 #define SSC_PIN_STEP          26
 #define SSC_PIN_DIR           27
 #define SSC_PIN_EN            14
@@ -43,6 +79,11 @@
 
 #ifndef SSC_LED_ACTIVE_STRIP_COUNT
 #define SSC_LED_ACTIVE_STRIP_COUNT 6
+#endif
+
+#if SSC_LED_PIN_MODE == SSC_LED_PIN_MODE_SWITCH
+#undef SSC_LED_ACTIVE_STRIP_COUNT
+#define SSC_LED_ACTIVE_STRIP_COUNT 0
 #endif
 
 #define SSC_STEPS_PER_FLOOR   25600

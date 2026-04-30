@@ -8,7 +8,6 @@ static_assert(SSC_LED_STRIP_COUNT == 6, "This firmware currently assumes exactly
 static_assert(SSC_LED_STRIP_COUNT <= 255, "LedPoint.y must fit in uint8_t.");
 static_assert(SSC_LED_STRIP_LEN <= 255, "LedPoint.x must fit in uint8_t.");
 static_assert(SSC_LED_TARGET_FPS > 0, "SSC_LED_TARGET_FPS must be greater than 0.");
-static_assert(SSC_LED_ACTIVE_STRIP_COUNT > 0, "SSC_LED_ACTIVE_STRIP_COUNT must be greater than 0.");
 static_assert(SSC_LED_ACTIVE_STRIP_COUNT <= SSC_LED_STRIP_COUNT,
               "SSC_LED_ACTIVE_STRIP_COUNT must be <= SSC_LED_STRIP_COUNT.");
 
