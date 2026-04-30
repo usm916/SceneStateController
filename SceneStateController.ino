@@ -53,6 +53,8 @@ static uint16_t calc_ramp_down_speed(uint32_t now_ms);
 static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
 static uint16_t manual_spin_speed_cap();
 static void apply_all_strip_scene(LedStripScene scene);
+static void apply_btn7_scene_cycle();
+static uint8_t s_btn7_scene_cycle_index = 0;
 
 static uint16_t manual_spin_speed_cap() {
   const float move_speed_f = elevator_move_max_speed();
@@ -66,6 +68,24 @@ static void apply_all_strip_scene(LedStripScene scene) {
   if (espnow_link_is_manager()) {
     (void)espnow_link_send_all_scene(scene);
   }
+}
+
+static void apply_btn7_scene_cycle() {
+  LedStripScene next_scene = LEDSCENE_FADE_OUT_3S;
+  switch (s_btn7_scene_cycle_index % 3) {
+    case 0:
+      next_scene = LEDSCENE_FADE_OUT_3S;
+      break;
+    case 1:
+      next_scene = LEDSCENE_BLACKOUT;
+      break;
+    case 2:
+    default:
+      next_scene = LEDSCENE_FADE_IN_3S;
+      break;
+  }
+  s_btn7_scene_cycle_index++;
+  apply_all_strip_scene(next_scene);
 }
 
 static void apply_led_override(uint8_t pattern_id) {
@@ -267,8 +287,8 @@ void loop() {
           button_position_store_set_zero(elevator_current_position_steps());
           Serial.println("mute: set current position as zero.");
         } else if (current_btn == BTN_7) {
-          apply_all_strip_scene(LEDSCENE_CRASH);
-          Serial.println("switch: all strips -> CRASH");
+          apply_btn7_scene_cycle();
+          Serial.println("switch: BTN_7 scene cycle -> FADEOUT/BLACKOUT/FADEIN");
         } else if (current_btn == BTN_8) {
           apply_all_strip_scene(LEDSCENE_SOLID);
           Serial.println("switch: all strips -> SOLID");
