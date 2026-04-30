@@ -15,6 +15,8 @@
 #include <string.h>
 #include <stdio.h>
 
+extern WebOtaBlinkApp app;
+
 namespace {
 extern WebOtaBlinkApp app;
 char s_serial_line[64] = {0};
