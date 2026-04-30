@@ -48,6 +48,7 @@ static bool mode_is(uint8_t mode);
 static void ensure_modules_for_mode(uint8_t mode);
 static void set_runtime_mode(uint8_t mode);
 static uint8_t normalize_runtime_mode(uint8_t mode);
+static bool set_wifi_slot_from_serial(int slot, const char* ssid, const char* pass);
 static uint16_t calc_ramp_up_speed(uint32_t now_ms);
 static uint16_t calc_ramp_down_speed(uint32_t now_ms);
 static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
@@ -102,6 +103,11 @@ static bool mode_is(uint8_t mode) {
 static uint8_t normalize_runtime_mode(uint8_t mode) {
   const uint8_t masked = mode & MODE_ALL;
   return (masked == 0) ? MODE_ALL : masked;
+}
+
+static bool set_wifi_slot_from_serial(int slot, const char* ssid, const char* pass) {
+  if (ssid == nullptr || pass == nullptr) return false;
+  return app.setWifiSlot(slot, String(ssid), String(pass));
 }
 
 static void ensure_modules_for_mode(uint8_t mode) {
@@ -212,7 +218,7 @@ void loop() {
 
   if (s_runtime_mode == MODE_ELEVATOR) {
     handleSerialInput();
-  } else if (serial_console_poll(s_log, set_runtime_mode, &serial_event)) {
+  } else if (serial_console_poll(s_log, set_runtime_mode, set_wifi_slot_from_serial, &serial_event)) {
     if (mode_is(MODE_SCENE)) {
       if (serial_event.type == EVT_PI_CMD_LED) {
         apply_led_override(serial_event.data.led.pattern_id);
