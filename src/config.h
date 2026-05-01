@@ -57,6 +57,7 @@
 #define SSC_TMC_UART_TX_PIN  17
 
 #define SSC_PIN_ENDSTOP_UP    25
+#define SSC_PIN_ENDSTOP_MID   34
 #define SSC_PIN_ENDSTOP_DOWN  13
 
 // Endstop input mode:
