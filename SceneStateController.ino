@@ -33,7 +33,6 @@ static bool s_led_ready = false;
 static bool s_elevator_ready = false;
 static bool s_scene_ready = false;
 static int8_t s_manual_spin_dir = 0;
-static RemoteButton s_last_floor_btn = BTN_NONE;
 static RemoteButton s_last_control_btn = BTN_NONE;
 static constexpr uint16_t kManualSpinReleaseGraceMs = 150;
 static constexpr uint16_t kManualSpinRampMs = 1500;
@@ -264,29 +263,9 @@ void loop() {
       const bool next_pressed = (current_btn == BTN_NEXT);
       const bool prev_released = ir_btn_released(BTN_PREV);
       const bool next_released = ir_btn_released(BTN_NEXT);
-      uint8_t floor_btn_index = 0;
-      const bool floor_btn_pressed = button_position_store_index_from_remote(current_btn, &floor_btn_index);
       const bool control_btn_pressed =
           current_btn == BTN_POWER || current_btn == BTN_EQ || current_btn == BTN_VOL_DOWN || current_btn == BTN_VOL_UP ||
           current_btn == BTN_MUTE || current_btn == BTN_7 || current_btn == BTN_8;
-
-      if (floor_btn_pressed && current_btn != s_last_floor_btn) {
-        int32_t target_steps = 0;
-        if (button_position_store_target(floor_btn_index, &target_steps)) {
-          handleInput(target_steps);
-        } else {
-          Serial.print("BTN_");
-          Serial.print(floor_btn_index);
-          Serial.println(" is not recorded. Use rec_<button> first.");
-        }
-        s_last_floor_btn = current_btn;
-        s_manual_spin_dir = 0;
-        s_manual_spin_current_speed = 0;
-        s_manual_spin_decel_start_ms = 0;
-        s_manual_spin_decel_start_speed = 0;
-      } else if (!floor_btn_pressed) {
-        s_last_floor_btn = BTN_NONE;
-      }
 
       if (control_btn_pressed && current_btn != s_last_control_btn) {
         if (current_btn == BTN_POWER) {
@@ -338,7 +317,7 @@ void loop() {
         const uint16_t ramp_speed = calc_ramp_up_speed(now_ms);
         command_manual_spin(1, ramp_speed);
         s_manual_spin_current_speed = ramp_speed;
-      } else if (!floor_btn_pressed && (current_btn == BTN_NONE || prev_released || next_released) &&
+      } else if ((current_btn == BTN_NONE || prev_released || next_released) &&
                  s_manual_spin_dir != 0 &&
                  (uint32_t)(now_ms - s_manual_spin_last_hold_ms) >= kManualSpinReleaseGraceMs) {
         if (s_manual_spin_decel_start_ms == 0) {
