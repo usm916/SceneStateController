@@ -145,6 +145,9 @@ void physical_button_input_poll() {
 #endif
 
     s_states[i].stable_pressed = next_pressed;
+    log_switch_transition(now_ms, i, "DEB", next_pressed,
+                          (uint32_t)(now_ms - s_states[i].last_change_ms),
+                          kMappedButtons[i]);
     if (next_pressed) {
       if (kMappedButtons[i] == BTN_NONE) {
         log_switch_transition(now_ms, i, "SKIP", next_pressed, 0, kMappedButtons[i]);
