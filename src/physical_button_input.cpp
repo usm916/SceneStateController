@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "ir_module.h"
+#include "runtime_mode.h"
 
 #include <Arduino.h>
 
@@ -50,7 +51,7 @@ bool physical_button_input_enabled() {
 #if SSC_LED_PIN_MODE == SSC_LED_PIN_MODE_SWITCH
   return true;
 #else
-  return false;
+  return (runtime_mode_get() & RUNTIME_MODE_LED) == 0;
 #endif
 }
 
