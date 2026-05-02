@@ -34,7 +34,6 @@ struct DebounceState {
 
 DebounceState s_states[6] = {};
 uint32_t s_last_poll_ms = 0;
-uint32_t s_last_debounced_log_ms = 0;
 
 bool read_pressed(uint8_t pin) {
   const int value = digitalRead(pin);
@@ -162,17 +161,4 @@ void physical_button_input_poll() {
     }
   }
 
-#if SSC_SWITCH_DEBOUNCE_ENABLE
-  if ((uint32_t)(now_ms - s_last_debounced_log_ms) >= SSC_SWITCH_RAW_LOG_INTERVAL_MS) {
-    s_last_debounced_log_ms = now_ms;
-    Serial.printf("SW DEB %lu | %u:%u %u:%u %u:%u %u:%u %u:%u %u:%u\n",
-                  (unsigned long)now_ms,
-                  kButtonPins[0], s_states[0].stable_pressed ? 1 : 0,
-                  kButtonPins[1], s_states[1].stable_pressed ? 1 : 0,
-                  kButtonPins[2], s_states[2].stable_pressed ? 1 : 0,
-                  kButtonPins[3], s_states[3].stable_pressed ? 1 : 0,
-                  kButtonPins[4], s_states[4].stable_pressed ? 1 : 0,
-                  kButtonPins[5], s_states[5].stable_pressed ? 1 : 0);
-  }
-#endif
 }
