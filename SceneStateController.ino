@@ -55,7 +55,16 @@ static void command_manual_spin(int8_t dir, uint16_t speed_steps_per_sec);
 static uint16_t manual_spin_speed_cap();
 static void apply_all_strip_scene(LedStripScene scene);
 static void apply_btn7_scene_cycle();
+static void log_io_mode_status(uint8_t mode);
 static uint8_t s_btn7_scene_cycle_index = 0;
+
+static void log_io_mode_status(uint8_t mode) {
+  const bool led_mode = (mode & MODE_LED) != 0;
+  const bool switch_read_mode = (mode & MODE_IR) != 0;
+  Serial.printf("[MODE] LED mode: %s, switch read mode: %s\n",
+                led_mode ? "ON" : "OFF",
+                switch_read_mode ? "ON" : "OFF");
+}
 
 static uint16_t manual_spin_speed_cap() {
   const float move_speed_f = elevator_move_max_speed();
@@ -144,6 +153,7 @@ static void set_runtime_mode(uint8_t mode) {
     scene_setup();
   }
   s_log.print_mode_change(prev_mode, s_runtime_mode);
+  log_io_mode_status(s_runtime_mode);
 }
 
 uint8_t runtime_mode_get() {
@@ -199,6 +209,7 @@ void setup() {
   physical_button_input_setup();
   led_set_updates_enabled(true);
   s_log.print_startup(s_runtime_mode);
+  log_io_mode_status(s_runtime_mode);
   Serial.print("FastLED RMT status: ");
   Serial.println(led_rmt_status_text());
 }
