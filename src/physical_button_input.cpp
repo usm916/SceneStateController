@@ -71,6 +71,25 @@ void physical_button_input_setup() {
   }
 
   Serial.println("Physical button mode: WS2812B pins configured as digital inputs.");
+  Serial.print("Physical button config: active_level=");
+#if SSC_SWITCH_ACTIVE_LOW
+  Serial.print("LOW");
+#else
+  Serial.print("HIGH");
+#endif
+  Serial.print(", input_mode=");
+#if SSC_SWITCH_USE_INPUT_PULLUP
+  Serial.println("INPUT_PULLUP");
+#else
+  Serial.println("INPUT");
+#endif
+
+  for (uint8_t i = 0; i < 6; i++) {
+    Serial.print("Physical button map: pin=");
+    Serial.print(kButtonPins[i]);
+    Serial.print(" -> code=0x");
+    Serial.println((uint8_t)kMappedButtons[i], HEX);
+  }
 }
 
 void physical_button_input_poll() {
