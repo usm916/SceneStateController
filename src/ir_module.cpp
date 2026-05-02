@@ -167,6 +167,9 @@ void ir_inject_button(RemoteButton btn, uint16_t hold_ms) {
   if (btn == BTN_NONE) {
     if (s_active_btn != BTN_NONE) {
       s_released_btn = s_active_btn;
+#if SSC_IR_LOG_ENABLE
+      Serial.printf("IR INJECT release btn=0x%02X\n", (uint8_t)s_released_btn);
+#endif
     }
     s_active_btn = BTN_NONE;
     s_active_btn_until_ms = 0;
@@ -178,4 +181,8 @@ void ir_inject_button(RemoteButton btn, uint16_t hold_ms) {
   }
   s_active_btn = btn;
   s_active_btn_until_ms = now_ms + ((hold_ms > 0) ? hold_ms : kIrHoldMs);
+#if SSC_IR_LOG_ENABLE
+  Serial.printf("IR INJECT btn=0x%02X hold=%u\n", (uint8_t)s_active_btn,
+                (unsigned int)((hold_ms > 0) ? hold_ms : kIrHoldMs));
+#endif
 }
