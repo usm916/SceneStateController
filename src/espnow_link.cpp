@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 #include <string.h>
 
 #include "config.h"
@@ -160,10 +161,20 @@ void espnow_link_setup() {
 
   esp_now_register_recv_cb(on_recv);
 
+  uint8_t resolved_channel = s_config.channel;
+  if (resolved_channel == 0) {
+    const int current_channel = WiFi.channel();
+    resolved_channel = (current_channel >= 1 && current_channel <= 14) ? (uint8_t)current_channel : SSC_ESPNOW_LINK_CHANNEL;
+  }
+
+  if (resolved_channel >= 1 && resolved_channel <= 14) {
+    (void)esp_wifi_set_channel(resolved_channel, WIFI_SECOND_CHAN_NONE);
+  }
+
   esp_now_peer_info_t peer_info = {};
   memcpy(peer_info.peer_addr, s_config.peer_mac, 6);
   peer_info.ifidx = WIFI_IF_STA;
-  peer_info.channel = s_config.channel;
+  peer_info.channel = resolved_channel;
   peer_info.encrypt = false;
 
   if (!esp_now_is_peer_exist(s_config.peer_mac)) {
@@ -175,7 +186,7 @@ void espnow_link_setup() {
 
   s_ready = true;
   s_peer_added = true;
-  Serial.println(role() == kRoleManager ? "[ESPNOW] link MANAGER ready" : "[ESPNOW] link NODE ready");
+  Serial.printf("[ESPNOW] role=%s channel=%u\n", role() == kRoleManager ? "MANAGER" : "NODE", resolved_channel);
 }
 
 void espnow_link_poll() {
