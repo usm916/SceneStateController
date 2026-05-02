@@ -1144,23 +1144,15 @@ String WebOtaBlinkApp::makeHtml() const
     const uint8_t b = blueFromWebColor(webColor);
     return (r < 128 || g < 128 || b < 128) ? "rgb(255,255,255)" : "rgb(48,48,48)";
   };
-  auto currentIpLastOctet = [&]() -> uint8_t
+  auto pageBgColorFromMac = [&](const uint8_t mac[6]) -> uint32_t
   {
-    IPAddress ip(0, 0, 0, 0);
-    if (apMode_)
+    // 同じMACなら毎回同じ色、異なるMACなら擬似ランダムで違う色にする。
+    uint32_t state = 2166136261UL; // FNV-1a seed
+    for (size_t i = 0; i < 6; ++i)
     {
-      ip = WiFi.softAPIP();
+      state ^= mac[i];
+      state *= 16777619UL;
     }
-    else if (WiFi.status() == WL_CONNECTED)
-    {
-      ip = WiFi.localIP();
-    }
-    return ip[3];
-  };
-  auto pageBgColorFromIpLastOctet = [&](uint8_t ipLastOctet) -> uint32_t
-  {
-    // 同じIP末尾なら毎回同じ色、異なるIP末尾なら擬似ランダムで違う色にする。
-    uint32_t state = ((uint32_t)ipLastOctet * 1103515245UL) + 12345UL;
     auto nextRand = [&]() -> uint8_t
     {
       state = (state * 1664525UL) + 1013904223UL;
@@ -1172,8 +1164,14 @@ String WebOtaBlinkApp::makeHtml() const
     return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
   };
 
-  const uint8_t ipLastOctet = currentIpLastOctet();
-  const uint32_t pageBgColor = pageBgColorFromIpLastOctet(ipLastOctet);
+  uint8_t pageMac[6] = {0};
+  if (esp_wifi_get_mac(WIFI_IF_STA, pageMac) != ESP_OK)
+  {
+    // 失敗時も色が毎回変わらないよう、固定値を使う。
+    const uint8_t fallbackMac[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
+    memcpy(pageMac, fallbackMac, sizeof(pageMac));
+  }
+  const uint32_t pageBgColor = pageBgColorFromMac(pageMac);
   const String pageBgCss = webColorCssText(pageBgColor);
   const char* pageTextColor = textColorForBg(pageBgColor);
 
