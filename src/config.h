@@ -27,6 +27,18 @@
 
 // RemoteButton code mapping for WS2812B pins when SSC_LED_PIN_MODE_SWITCH is enabled.
 // Defaults: emergency stop, hold-up, hold-down, all CRASH, all SOLID, spare.
+
+#ifndef SSC_SWITCH_DEBOUNCE_ENABLE
+#define SSC_SWITCH_DEBOUNCE_ENABLE 0
+#endif
+
+#ifndef SSC_SWITCH_POLL_INTERVAL_MS
+#define SSC_SWITCH_POLL_INTERVAL_MS 5
+#endif
+
+#ifndef SSC_SWITCH_RAW_LOG_INTERVAL_MS
+#define SSC_SWITCH_RAW_LOG_INTERVAL_MS 30
+#endif
 #ifndef SSC_SWITCH_BUTTON_CODE_0
 #define SSC_SWITCH_BUTTON_CODE_0 0x45  // BTN_POWER (emergency stop)
 #endif

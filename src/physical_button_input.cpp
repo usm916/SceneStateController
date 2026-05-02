@@ -26,8 +26,6 @@ constexpr RemoteButton kMappedButtons[6] = {
     (RemoteButton)SSC_SWITCH_BUTTON_CODE_5,
 };
 
-constexpr uint16_t kDebounceMs = 20;
-
 struct DebounceState {
   bool raw_pressed;
   bool stable_pressed;
@@ -35,6 +33,8 @@ struct DebounceState {
 };
 
 DebounceState s_states[6] = {};
+uint32_t s_last_poll_ms = 0;
+uint32_t s_last_raw_log_ms = 0;
 
 bool read_pressed(uint8_t pin) {
   const int value = digitalRead(pin);
@@ -96,22 +96,46 @@ void physical_button_input_poll() {
   if (!physical_button_input_enabled()) return;
 
   const uint32_t now_ms = millis();
+  if ((uint32_t)(now_ms - s_last_poll_ms) < SSC_SWITCH_POLL_INTERVAL_MS) return;
+  s_last_poll_ms = now_ms;
+
+  bool raw_pressed_values[6] = {};
+
   for (uint8_t i = 0; i < 6; i++) {
     const bool raw_pressed = read_pressed(kButtonPins[i]);
+    raw_pressed_values[i] = raw_pressed;
     if (raw_pressed != s_states[i].raw_pressed) {
       s_states[i].raw_pressed = raw_pressed;
       s_states[i].last_change_ms = now_ms;
     }
 
+#if SSC_SWITCH_DEBOUNCE_ENABLE
     if (raw_pressed == s_states[i].stable_pressed) continue;
-    if ((now_ms - s_states[i].last_change_ms) < kDebounceMs) continue;
+    if ((uint32_t)(now_ms - s_states[i].last_change_ms) < 20) continue;
+    const bool next_pressed = raw_pressed;
+#else
+    if (raw_pressed == s_states[i].stable_pressed) continue;
+    const bool next_pressed = raw_pressed;
+#endif
 
-    s_states[i].stable_pressed = raw_pressed;
-    if (raw_pressed) {
+    s_states[i].stable_pressed = next_pressed;
+    if (next_pressed) {
       if (kMappedButtons[i] == BTN_NONE) continue;
       ir_inject_button(kMappedButtons[i], 250);
     } else if (ir_active_btn() == kMappedButtons[i]) {
       ir_inject_button(BTN_NONE);
     }
+  }
+
+  if ((uint32_t)(now_ms - s_last_raw_log_ms) >= SSC_SWITCH_RAW_LOG_INTERVAL_MS) {
+    s_last_raw_log_ms = now_ms;
+    Serial.printf("SW RAW %lu | %u:%u %u:%u %u:%u %u:%u %u:%u %u:%u\n",
+                  (unsigned long)now_ms,
+                  kButtonPins[0], raw_pressed_values[0] ? 1 : 0,
+                  kButtonPins[1], raw_pressed_values[1] ? 1 : 0,
+                  kButtonPins[2], raw_pressed_values[2] ? 1 : 0,
+                  kButtonPins[3], raw_pressed_values[3] ? 1 : 0,
+                  kButtonPins[4], raw_pressed_values[4] ? 1 : 0,
+                  kButtonPins[5], raw_pressed_values[5] ? 1 : 0);
   }
 }
