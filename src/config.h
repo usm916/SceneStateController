@@ -29,7 +29,7 @@
 // Defaults: emergency stop, hold-up, hold-down, all CRASH, all SOLID, spare.
 
 #ifndef SSC_SWITCH_DEBOUNCE_ENABLE
-#define SSC_SWITCH_DEBOUNCE_ENABLE 0
+#define SSC_SWITCH_DEBOUNCE_ENABLE 1
 #endif
 
 #ifndef SSC_SWITCH_POLL_INTERVAL_MS
