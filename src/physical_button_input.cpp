@@ -34,6 +34,14 @@ struct DebounceState {
 
 DebounceState s_states[6] = {};
 uint32_t s_last_poll_ms = 0;
+uint32_t s_last_hold_inject_ms[6] = {};
+
+constexpr uint16_t kSwitchInjectHoldMs = 250;
+constexpr uint16_t kHoldRefreshIntervalMs = 120;
+
+bool is_hold_button(RemoteButton btn) {
+  return btn == BTN_PREV || btn == BTN_NEXT;
+}
 
 bool read_pressed(uint8_t pin) {
   const int value = digitalRead(pin);
@@ -153,12 +161,25 @@ void physical_button_input_poll() {
         log_switch_transition(now_ms, i, "SKIP", next_pressed, 0, kMappedButtons[i]);
         continue;
       }
-      ir_inject_button(kMappedButtons[i], 250);
-      log_switch_transition(now_ms, i, "INJECT", next_pressed, 250, kMappedButtons[i]);
+      ir_inject_button(kMappedButtons[i], kSwitchInjectHoldMs);
+      s_last_hold_inject_ms[i] = now_ms;
+      log_switch_transition(now_ms, i, "INJECT", next_pressed, kSwitchInjectHoldMs, kMappedButtons[i]);
     } else if (ir_active_btn() == kMappedButtons[i]) {
       ir_inject_button(BTN_NONE);
+      s_last_hold_inject_ms[i] = 0;
       log_switch_transition(now_ms, i, "RELEASE", next_pressed, 0, kMappedButtons[i]);
     }
+
+    continue;
+  }
+
+  for (uint8_t i = 0; i < 6; i++) {
+    if (!s_states[i].stable_pressed) continue;
+    if (!is_hold_button(kMappedButtons[i])) continue;
+    if ((uint32_t)(now_ms - s_last_hold_inject_ms[i]) < kHoldRefreshIntervalMs) continue;
+    ir_inject_button(kMappedButtons[i], kSwitchInjectHoldMs);
+    s_last_hold_inject_ms[i] = now_ms;
+    log_switch_transition(now_ms, i, "HOLD", true, kSwitchInjectHoldMs, kMappedButtons[i]);
   }
 
 }
