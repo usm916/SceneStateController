@@ -55,7 +55,7 @@ static uint16_t manual_spin_speed_cap();
 static void apply_all_strip_scene(LedStripScene scene);
 static void apply_btn7_scene_cycle();
 static void log_io_mode_status(uint8_t mode);
-static uint8_t s_btn7_scene_cycle_index = 0;
+static bool s_btn7_next_is_fade_in = true;
 
 static void log_io_mode_status(uint8_t mode) {
   const bool led_mode = (mode & MODE_LED) != 0;
@@ -80,19 +80,8 @@ static void apply_all_strip_scene(LedStripScene scene) {
 }
 
 static void apply_btn7_scene_cycle() {
-  LedStripScene next_scene = LEDSCENE_FADE_OUT_3S;
-  switch (s_btn7_scene_cycle_index % 2) {
-    case 0:
-      next_scene = LEDSCENE_FADE_OUT_3S;
-      break;
-    case 1:
-      next_scene = LEDSCENE_FADE_IN_3S;
-      break;
-    default:
-      next_scene = LEDSCENE_FADE_OUT_3S;
-      break;
-  }
-  s_btn7_scene_cycle_index++;
+  const LedStripScene next_scene = s_btn7_next_is_fade_in ? LEDSCENE_FADE_IN_3S : LEDSCENE_FADE_OUT_3S;
+  s_btn7_next_is_fade_in = !s_btn7_next_is_fade_in;
   apply_all_strip_scene(next_scene);
 }
 
@@ -209,6 +198,10 @@ void setup() {
   ensure_modules_for_mode(s_runtime_mode);
   physical_button_input_setup();
   led_set_updates_enabled(true);
+  if (mode_is(MODE_LED)) {
+    apply_all_strip_scene(LEDSCENE_BLACKOUT);
+    s_btn7_next_is_fade_in = true;
+  }
   s_log.print_startup(s_runtime_mode);
   log_io_mode_status(s_runtime_mode);
   Serial.print("FastLED RMT status: ");
@@ -281,14 +274,12 @@ void loop() {
         } else if (current_btn == BTN_MUTE) {
           button_position_store_set_zero(elevator_current_position_steps());
           Serial.println("mute: set current position as zero.");
-        } else if (current_btn == app.switchModeD33ButtonCode()) {
-          if (current_btn == BTN_7) {
-            apply_btn7_scene_cycle();
-            Serial.println("switch: BTN_7 scene cycle -> FADEOUT/FADEIN");
-          } else {
-            apply_all_strip_scene(LEDSCENE_NOISE_FLAME);
-            Serial.println("switch: all strips -> NOISE");
-          }
+        } else if (current_btn == BTN_7) {
+          apply_btn7_scene_cycle();
+          Serial.println("switch: BTN_7 scene cycle -> FADEIN/FADEOUT");
+        } else if (current_btn == BTN_8) {
+          apply_all_strip_scene(LEDSCENE_NOISE_FLAME);
+          Serial.println("switch: all strips -> NOISE");
         }
         s_last_control_btn = current_btn;
         s_manual_spin_dir = 0;
