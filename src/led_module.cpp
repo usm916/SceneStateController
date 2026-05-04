@@ -58,6 +58,9 @@ static uint8_t s_blink_level = 255;
 static uint8_t s_global_brightness_pct = 100;
 static constexpr const char* kLedPrefsNamespace = "led";
 static constexpr const char* kLedBrightnessKey = "brightness";
+static constexpr const char* kLedNoiseBaseMinKey = "noise_base";
+static constexpr const char* kLedNoiseAmplitudeMaxKey = "noise_amp";
+static constexpr const char* kLedNoiseSpeedKey = "noise_speed";
 static uint32_t s_scene_start_ms[SSC_LED_STRIP_COUNT] = {0};
 static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{0}};
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
@@ -148,6 +151,7 @@ static void add_strip_controller(uint8_t strip_index) {
 void led_setup() {
   randomSeed(micros());
   led_load_saved_brightness();
+  led_load_saved_noise_params();
 
   for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
@@ -194,6 +198,26 @@ bool led_save_global_brightness_pct() {
   const size_t written = prefs.putUChar(kLedBrightnessKey, s_global_brightness_pct);
   prefs.end();
   return written > 0;
+}
+
+void led_load_saved_noise_params() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, true)) return;
+  const uint8_t savedBase = prefs.getUChar(kLedNoiseBaseMinKey, s_noise_base_min);
+  const uint8_t savedAmp = prefs.getUChar(kLedNoiseAmplitudeMaxKey, s_noise_amplitude_max);
+  const uint8_t savedSpeed = prefs.getUChar(kLedNoiseSpeedKey, s_noise_speed);
+  prefs.end();
+  (void)led_set_noise_params(savedBase, savedAmp, savedSpeed);
+}
+
+bool led_save_noise_params() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, false)) return false;
+  const size_t baseWritten = prefs.putUChar(kLedNoiseBaseMinKey, s_noise_base_min);
+  const size_t ampWritten = prefs.putUChar(kLedNoiseAmplitudeMaxKey, s_noise_amplitude_max);
+  const size_t speedWritten = prefs.putUChar(kLedNoiseSpeedKey, s_noise_speed);
+  prefs.end();
+  return baseWritten > 0 && ampWritten > 0 && speedWritten > 0;
 }
 
 void led_set_updates_enabled(bool enabled) {
