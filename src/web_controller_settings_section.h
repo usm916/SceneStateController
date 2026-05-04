@@ -14,6 +14,11 @@ R"HTML(
 <label>Button zero steps (mute equivalent)</label>
 <input name='btn_zero_steps' type='number' value='{{BTN_ZERO_STEPS}}'>
 {{BTN_RELATIVE_ROWS}}
+<label>D33 action in switch mode</label>
+<select name='switch_mode_d33_action'>
+<option value='BTN_7' {{SWITCH_MODE_D33_BTN7_SELECTED}}>BTN_7: FADEOUT/FADEIN cycle</option>
+<option value='BTN_8' {{SWITCH_MODE_D33_BTN8_SELECTED}}>BTN_8: ALL NOISE</option>
+</select>
 <p class='small'>INFOやserial/IRで更新可能な値をここから書き換えできます。保存時にNVSへ永続化します。</p>
 <button type='submit'>Save Controller Settings</button>
 </form>

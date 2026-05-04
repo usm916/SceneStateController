@@ -27,6 +27,7 @@ static constexpr const char* kEspnowRoleKey = "esp_role";
 static constexpr const char* kEspnowChannelKey = "esp_channel";
 static constexpr const char* kEspnowPeerMacKey = "esp_peer_mac";
 static constexpr const char* kSelfStaMacKey = "self_sta_mac";
+static constexpr const char* kSwitchModeD33ButtonKey = "sw_d33_btn";
 static constexpr uint32_t kStripSceneCooldownMs = 500;
 static uint32_t s_lastStripSceneRequestMs = 0;
 
@@ -98,6 +99,11 @@ bool WebOtaBlinkApp::getSavedRuntimeMode(uint8_t* out_mode) const
   return true;
 }
 
+uint8_t WebOtaBlinkApp::switchModeD33ButtonCode() const
+{
+  return switchModeD33ButtonCode_;
+}
+
 bool WebOtaBlinkApp::setWifiSlot(int slot, const String& ssid, const String& pass)
 {
   if (slot < 0 || slot >= kMaxWifiSlots)
@@ -164,6 +170,12 @@ void WebOtaBlinkApp::loadSettings()
     customStaMac_[0] = (customStaMac_[0] | 0x02) & 0xFE;
   }
   const String peerMacText = prefs_.getString(kEspnowPeerMacKey, "");
+  const uint8_t savedD33Button = prefs_.getUChar(kSwitchModeD33ButtonKey, BTN_8);
+  if (savedD33Button == BTN_7 || savedD33Button == BTN_8) {
+    switchModeD33ButtonCode_ = savedD33Button;
+  } else {
+    switchModeD33ButtonCode_ = BTN_8;
+  }
   if (!parseMacText(peerMacText, espnowConfig_.peer_mac)) {
     const uint8_t defaultPeerMac[6] = SSC_ESPNOW_LINK_PEER_MAC;
     memcpy(espnowConfig_.peer_mac, defaultPeerMac, sizeof(espnowConfig_.peer_mac));
@@ -204,6 +216,7 @@ void WebOtaBlinkApp::saveSettings()
   prefs_.putUChar(kEspnowChannelKey, espnowConfig_.channel);
   prefs_.putString(kSelfStaMacKey, customMacText());
   prefs_.putString(kEspnowPeerMacKey, espnowPeerMacText());
+  prefs_.putUChar(kSwitchModeD33ButtonKey, switchModeD33ButtonCode_);
 
   prefs_.end();
 }
@@ -526,6 +539,26 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     updated = true;
   }
 
+  String switchModeD33Action;
+  if (request->hasParam("switch_mode_d33_action", true))
+  {
+    const AsyncWebParameter* d33Param = request->getParam("switch_mode_d33_action", true);
+    if (d33Param != nullptr)
+    {
+      switchModeD33Action = d33Param->value();
+      if (switchModeD33Action == "BTN_7")
+      {
+        switchModeD33ButtonCode_ = BTN_7;
+        updated = true;
+      }
+      else if (switchModeD33Action == "BTN_8")
+      {
+        switchModeD33ButtonCode_ = BTN_8;
+        updated = true;
+      }
+    }
+  }
+
   int32_t ledGlobalBrightnessPct = 0;
   if (parseIntParam(request, "led_global_brightness_pct", &ledGlobalBrightnessPct))
   {
@@ -557,6 +590,7 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     (void)elevator_save_motion_profile();
     (void)button_position_store_save();
     (void)led_save_global_brightness_pct();
+    (void)led_save_noise_params();
   }
 
   request->redirect("/");
@@ -1114,6 +1148,8 @@ String WebOtaBlinkApp::renderControllerSettingsSection() const
   section.replace("{{MOVE_ACCEL_STEPS_PER_SEC2}}", String((int32_t)elevator_move_acceleration()));
   section.replace("{{BTN_ZERO_STEPS}}", String(button_position_store_zero_steps()));
   section.replace("{{LED_GLOBAL_BRIGHTNESS_PCT}}", String(led_global_brightness_pct()));
+  section.replace("{{SWITCH_MODE_D33_BTN7_SELECTED}}", switchModeD33ButtonCode_ == BTN_7 ? "selected" : "");
+  section.replace("{{SWITCH_MODE_D33_BTN8_SELECTED}}", switchModeD33ButtonCode_ == BTN_8 ? "selected" : "");
 
   String relativeRows;
   for (int i = 0; i <= 9; ++i)

@@ -281,12 +281,14 @@ void loop() {
         } else if (current_btn == BTN_MUTE) {
           button_position_store_set_zero(elevator_current_position_steps());
           Serial.println("mute: set current position as zero.");
-        } else if (current_btn == BTN_7) {
-          apply_btn7_scene_cycle();
-          Serial.println("switch: BTN_7 scene cycle -> FADEOUT/FADEIN");
-        } else if (current_btn == BTN_8) {
-          apply_all_strip_scene(LEDSCENE_NOISE_FLAME);
-          Serial.println("switch: all strips -> NOISE");
+        } else if (current_btn == app.switchModeD33ButtonCode()) {
+          if (current_btn == BTN_7) {
+            apply_btn7_scene_cycle();
+            Serial.println("switch: BTN_7 scene cycle -> FADEOUT/FADEIN");
+          } else {
+            apply_all_strip_scene(LEDSCENE_NOISE_FLAME);
+            Serial.println("switch: all strips -> NOISE");
+          }
         }
         s_last_control_btn = current_btn;
         s_manual_spin_dir = 0;
