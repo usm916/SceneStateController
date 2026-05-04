@@ -81,7 +81,7 @@ static void apply_all_strip_scene(LedStripScene scene) {
 
 static void apply_btn7_scene_cycle() {
   LedStripScene next_scene = LEDSCENE_FADE_OUT_3S;
-  switch (s_btn7_scene_cycle_index % 3) {
+  switch (s_btn7_scene_cycle_index % 2) {
     case 0:
       next_scene = LEDSCENE_FADE_OUT_3S;
       break;
@@ -89,7 +89,7 @@ static void apply_btn7_scene_cycle() {
       next_scene = LEDSCENE_FADE_IN_3S;
       break;
     default:
-      next_scene = LEDSCENE_NOISE_FLAME;
+      next_scene = LEDSCENE_FADE_OUT_3S;
       break;
   }
   s_btn7_scene_cycle_index++;
@@ -283,7 +283,7 @@ void loop() {
           Serial.println("mute: set current position as zero.");
         } else if (current_btn == BTN_7) {
           apply_btn7_scene_cycle();
-          Serial.println("switch: BTN_7 scene cycle -> FADEOUT/FADEIN/NOISE");
+          Serial.println("switch: BTN_7 scene cycle -> FADEOUT/FADEIN");
         } else if (current_btn == BTN_8) {
           apply_all_strip_scene(LEDSCENE_NOISE_FLAME);
           Serial.println("switch: all strips -> NOISE");
