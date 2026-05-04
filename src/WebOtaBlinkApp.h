@@ -45,7 +45,7 @@ private:
   bool webNextToggleOn_ = false;
   unsigned long nextWebToggleInjectAtMs_ = 0;
   bool hasSavedRuntimeMode_ = false;
-  uint8_t switchModeD33ButtonCode_ = BTN_8;
+  uint8_t switchModeD33ButtonCode_ = 0;
   uint8_t savedRuntimeMode_ = 0;
   EspnowLinkConfig espnowConfig_{};
 
