@@ -6,6 +6,7 @@
 #include <Preferences.h>
 #include "scene_state.h"
 #include "espnow_link.h"
+#include "events.h"
 
 class WebOtaBlinkApp
 {
@@ -14,6 +15,7 @@ public:
   void loop();
   bool getSavedRuntimeMode(uint8_t* out_mode) const;
   bool setWifiSlot(int slot, const String& ssid, const String& pass);
+  uint8_t switchModeD33ButtonCode() const;
 
 private:
   static constexpr int kMaxWifiSlots = 3;
@@ -43,6 +45,7 @@ private:
   bool webNextToggleOn_ = false;
   unsigned long nextWebToggleInjectAtMs_ = 0;
   bool hasSavedRuntimeMode_ = false;
+  uint8_t switchModeD33ButtonCode_ = BTN_8;
   uint8_t savedRuntimeMode_ = 0;
   EspnowLinkConfig espnowConfig_{};
 
