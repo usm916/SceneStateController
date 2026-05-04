@@ -26,7 +26,7 @@
 #endif
 
 // RemoteButton code mapping for WS2812B pins when SSC_LED_PIN_MODE_SWITCH is enabled.
-// Defaults: emergency stop, hold-up, hold-down, all CRASH, all SOLID, spare.
+// Defaults: emergency stop, hold-up, hold-down, all CRASH, all NOISE, spare.
 
 #ifndef SSC_SWITCH_DEBOUNCE_ENABLE
 #define SSC_SWITCH_DEBOUNCE_ENABLE 1
