@@ -155,7 +155,7 @@ void led_setup() {
 
   for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
-    s_strip_scenes[strip] = LEDSCENE_SOLID;
+    s_strip_scenes[strip] = LEDSCENE_BLACKOUT;
     s_chase_pos[strip] = 0;
   }
 
