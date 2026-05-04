@@ -19,6 +19,10 @@ R"HTML(
 <option value='BTN_7' {{SWITCH_MODE_D33_BTN7_SELECTED}}>BTN_7: FADEOUT/FADEIN cycle</option>
 <option value='BTN_8' {{SWITCH_MODE_D33_BTN8_SELECTED}}>BTN_8: ALL NOISE</option>
 </select>
+<label>LED base color preset</label>
+<select name='led_base_color_candidate_index'>
+{{LED_BASE_COLOR_CANDIDATE_OPTIONS}}
+</select>
 <p class='small'>INFOやserial/IRで更新可能な値をここから書き換えできます。保存時にNVSへ永続化します。</p>
 <button type='submit'>Save Controller Settings</button>
 </form>

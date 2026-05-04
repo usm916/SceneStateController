@@ -34,6 +34,11 @@ bool led_set_noise_params(uint8_t base_min, uint8_t amplitude_max, uint8_t speed
 void led_get_noise_params(uint8_t* out_base_min, uint8_t* out_amplitude_max, uint8_t* out_speed);
 bool led_set_global_brightness_pct(uint8_t brightness_pct);
 uint8_t led_global_brightness_pct();
+uint8_t led_cycle_base_color_candidate();
+uint8_t led_base_color_candidate_index();
+bool led_set_base_color_candidate_index(uint8_t index);
+void led_load_saved_base_color_candidate_index();
+bool led_save_base_color_candidate_index();
 void led_load_saved_brightness();
 bool led_save_global_brightness_pct();
 void led_load_saved_noise_params();

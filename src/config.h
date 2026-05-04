@@ -226,6 +226,18 @@ constexpr SscRgbColor SSC_LED_STRIP_BASE_COLORS[SSC_LED_STRIP_COUNT] = {
 static_assert(sizeof(SSC_LED_STRIP_BASE_COLORS) / sizeof(SSC_LED_STRIP_BASE_COLORS[0]) == SSC_LED_STRIP_COUNT,
               "SSC_LED_STRIP_BASE_COLORS count mismatch");
 
+// LED base color presets (global) used for LED mode color switching.
+// Press action can cycle through these colors in order.
+constexpr SscRgbColor SSC_LED_BASE_COLOR_CANDIDATES[] = {
+  {192, 225, 255},  // icy white-blue
+  {255, 170, 64},   // warm amber
+  {120, 255, 160},  // mint green
+  {220, 140, 255},  // soft violet
+};
+constexpr size_t SSC_LED_BASE_COLOR_CANDIDATE_COUNT =
+    sizeof(SSC_LED_BASE_COLOR_CANDIDATES) / sizeof(SSC_LED_BASE_COLOR_CANDIDATES[0]);
+static_assert(SSC_LED_BASE_COLOR_CANDIDATE_COUNT > 0, "SSC_LED_BASE_COLOR_CANDIDATES must not be empty");
+
 constexpr size_t SSC_WEB_REMOTE_BUTTON_COUNT = 21;
 
 constexpr const char* SSC_WEB_REMOTE_BUTTON_KEYS[SSC_WEB_REMOTE_BUTTON_COUNT] = {

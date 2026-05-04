@@ -260,7 +260,7 @@ void loop() {
       const bool next_released = ir_btn_released(BTN_NEXT);
       const bool control_btn_pressed =
           current_btn == BTN_POWER || current_btn == BTN_EQ || current_btn == BTN_VOL_DOWN || current_btn == BTN_VOL_UP ||
-          current_btn == BTN_MUTE || current_btn == BTN_7 || current_btn == BTN_8;
+          current_btn == BTN_MUTE || current_btn == BTN_7 || current_btn == BTN_8 || current_btn == BTN_9;
 
       if (control_btn_pressed && current_btn != s_last_control_btn) {
         if (current_btn == BTN_POWER) {
@@ -280,6 +280,9 @@ void loop() {
         } else if (current_btn == BTN_8) {
           apply_all_strip_scene(LEDSCENE_NOISE_FLAME);
           Serial.println("switch: all strips -> NOISE");
+        } else if (current_btn == BTN_9) {
+          const uint8_t next_index = led_cycle_base_color_candidate();
+          Serial.printf("switch: LED base color candidate -> #%u\n", (unsigned int)next_index);
         }
         s_last_control_btn = current_btn;
         s_manual_spin_dir = 0;
