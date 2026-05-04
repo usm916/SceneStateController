@@ -61,6 +61,7 @@ static constexpr const char* kLedBrightnessKey = "brightness";
 static constexpr const char* kLedNoiseBaseMinKey = "noise_base";
 static constexpr const char* kLedNoiseAmplitudeMaxKey = "noise_amp";
 static constexpr const char* kLedNoiseSpeedKey = "noise_speed";
+static constexpr const char* kLedBaseColorCandidateIndexKey = "base_color_i";
 static uint32_t s_scene_start_ms[SSC_LED_STRIP_COUNT] = {0};
 static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{0}};
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
@@ -69,11 +70,16 @@ static bool s_crash_on[SSC_LED_STRIP_COUNT] = {false};
 static uint8_t s_noise_base_min = 40;
 static uint8_t s_noise_amplitude_max = 80;
 static uint8_t s_noise_speed = 24;
+static uint8_t s_base_color_candidate_index = 0;
 static constexpr uint8_t kColorGuardThreshold = 10;
 static constexpr uint8_t kColorGuardFloor = 6;
 
 static CRGB strip_base_color(uint8_t strip_index) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return CRGB(16, 16, 16);
+  if (SSC_LED_BASE_COLOR_CANDIDATE_COUNT > 0) {
+    const SscRgbColor& c = SSC_LED_BASE_COLOR_CANDIDATES[s_base_color_candidate_index];
+    return CRGB(c.r, c.g, c.b);
+  }
   const SscRgbColor& c = SSC_LED_STRIP_BASE_COLORS[strip_index];
   return CRGB(c.r, c.g, c.b);
 }
@@ -152,6 +158,7 @@ void led_setup() {
   randomSeed(micros());
   led_load_saved_brightness();
   led_load_saved_noise_params();
+  led_load_saved_base_color_candidate_index();
 
   for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
@@ -182,6 +189,39 @@ bool led_set_global_brightness_pct(uint8_t brightness_pct) {
 
 uint8_t led_global_brightness_pct() {
   return s_global_brightness_pct;
+}
+
+uint8_t led_cycle_base_color_candidate() {
+  if (SSC_LED_BASE_COLOR_CANDIDATE_COUNT == 0) return 0;
+  s_base_color_candidate_index = (uint8_t)((s_base_color_candidate_index + 1) % SSC_LED_BASE_COLOR_CANDIDATE_COUNT);
+  return s_base_color_candidate_index;
+}
+
+uint8_t led_base_color_candidate_index() {
+  return s_base_color_candidate_index;
+}
+
+bool led_set_base_color_candidate_index(uint8_t index) {
+  if (SSC_LED_BASE_COLOR_CANDIDATE_COUNT == 0) return false;
+  if (index >= SSC_LED_BASE_COLOR_CANDIDATE_COUNT) return false;
+  s_base_color_candidate_index = index;
+  return true;
+}
+
+void led_load_saved_base_color_candidate_index() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, true)) return;
+  const uint8_t saved = prefs.getUChar(kLedBaseColorCandidateIndexKey, s_base_color_candidate_index);
+  prefs.end();
+  (void)led_set_base_color_candidate_index(saved);
+}
+
+bool led_save_base_color_candidate_index() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, false)) return false;
+  const size_t written = prefs.putUChar(kLedBaseColorCandidateIndexKey, s_base_color_candidate_index);
+  prefs.end();
+  return written > 0;
 }
 
 void led_load_saved_brightness() {

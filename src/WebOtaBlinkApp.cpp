@@ -571,6 +571,17 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     }
   }
 
+  int32_t ledBaseColorCandidateIndex = -1;
+  if (parseIntParam(request, "led_base_color_candidate_index", &ledBaseColorCandidateIndex))
+  {
+    if (ledBaseColorCandidateIndex >= 0 &&
+        ledBaseColorCandidateIndex < (int32_t)SSC_LED_BASE_COLOR_CANDIDATE_COUNT &&
+        led_set_base_color_candidate_index((uint8_t)ledBaseColorCandidateIndex))
+    {
+      updated = true;
+    }
+  }
+
   for (int i = 0; i <= 9; ++i)
   {
     const String key = "btn_" + String(i) + "_relative_steps";
@@ -591,6 +602,7 @@ void WebOtaBlinkApp::handleSaveControl(AsyncWebServerRequest* request)
     (void)button_position_store_save();
     (void)led_save_global_brightness_pct();
     (void)led_save_noise_params();
+    (void)led_save_base_color_candidate_index();
   }
 
   request->redirect("/");
@@ -1150,6 +1162,29 @@ String WebOtaBlinkApp::renderControllerSettingsSection() const
   section.replace("{{LED_GLOBAL_BRIGHTNESS_PCT}}", String(led_global_brightness_pct()));
   section.replace("{{SWITCH_MODE_D33_BTN7_SELECTED}}", switchModeD33ButtonCode_ == BTN_7 ? "selected" : "");
   section.replace("{{SWITCH_MODE_D33_BTN8_SELECTED}}", switchModeD33ButtonCode_ == BTN_8 ? "selected" : "");
+
+  String ledBaseColorOptions;
+  const uint8_t selectedIndex = led_base_color_candidate_index();
+  for (size_t i = 0; i < SSC_LED_BASE_COLOR_CANDIDATE_COUNT; ++i)
+  {
+    ledBaseColorOptions += "<option value='";
+    ledBaseColorOptions += String((int)i);
+    ledBaseColorOptions += "'";
+    if ((uint8_t)i == selectedIndex)
+    {
+      ledBaseColorOptions += " selected";
+    }
+    ledBaseColorOptions += ">Preset ";
+    ledBaseColorOptions += String((int)i);
+    ledBaseColorOptions += " (";
+    ledBaseColorOptions += String((int)SSC_LED_BASE_COLOR_CANDIDATES[i].r);
+    ledBaseColorOptions += ",";
+    ledBaseColorOptions += String((int)SSC_LED_BASE_COLOR_CANDIDATES[i].g);
+    ledBaseColorOptions += ",";
+    ledBaseColorOptions += String((int)SSC_LED_BASE_COLOR_CANDIDATES[i].b);
+    ledBaseColorOptions += ")</option>";
+  }
+  section.replace("{{LED_BASE_COLOR_CANDIDATE_OPTIONS}}", ledBaseColorOptions);
 
   String relativeRows;
   for (int i = 0; i <= 9; ++i)
