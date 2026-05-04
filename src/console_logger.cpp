@@ -50,7 +50,7 @@ void ConsoleLogger::print_mode_usage() {
   out_.println("Preset cmds: mute | rec_<btn> | rec_<btn>_<steps> | save_pref");
   out_.println("Motion cmds: speed_<steps/s> | accel_<steps/s2>");
   out_.println("Current cmd: current_<1..2000>  (TMC run current mA)");
-  out_.println("LED scene cmd: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
+  out_.println("LED scene cmd: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|NOISE|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
   out_.println("Scene cmd: SCENE <IDLE|MOVE|ARRIVED|ERROR>");
   out_.println("Brightness cmd: brightness_<0..100>");
   out_.println("WiFi cmd: WIFI <0..2> <ssid> <pass>");

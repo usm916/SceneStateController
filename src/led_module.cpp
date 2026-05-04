@@ -63,6 +63,9 @@ static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] 
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
 static uint32_t s_crash_next_toggle_ms[SSC_LED_STRIP_COUNT] = {0};
 static bool s_crash_on[SSC_LED_STRIP_COUNT] = {false};
+static uint8_t s_noise_base_min = 40;
+static uint8_t s_noise_amplitude_max = 80;
+static uint8_t s_noise_speed = 24;
 static constexpr uint8_t kColorGuardThreshold = 10;
 static constexpr uint8_t kColorGuardFloor = 6;
 
@@ -254,6 +257,21 @@ void led_set_strip_scene(uint8_t strip_index, LedStripScene scene) {
   s_crash_on[strip_index] = false;
 }
 
+bool led_set_noise_params(uint8_t base_min, uint8_t amplitude_max, uint8_t speed) {
+  if ((uint16_t)base_min + (uint16_t)amplitude_max > 255) return false;
+  if (speed == 0) return false;
+  s_noise_base_min = base_min;
+  s_noise_amplitude_max = amplitude_max;
+  s_noise_speed = speed;
+  return true;
+}
+
+void led_get_noise_params(uint8_t* out_base_min, uint8_t* out_amplitude_max, uint8_t* out_speed) {
+  if (out_base_min != nullptr) *out_base_min = s_noise_base_min;
+  if (out_amplitude_max != nullptr) *out_amplitude_max = s_noise_amplitude_max;
+  if (out_speed != nullptr) *out_speed = s_noise_speed;
+}
+
 static void paint_strip_solid(uint8_t strip_index, const CRGB& color) {
   for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
     s_leds[strip_index][i] = color;
@@ -330,6 +348,18 @@ static void paint_strip_crash_global_random_then_on(uint8_t strip_index, const C
   paint_strip_solid(strip_index, s_crash_on[strip_index] ? apply_brightness(base, 255) : CRGB::Black);
 }
 
+static void paint_strip_noise_flame(uint8_t strip_index, const CRGB& base, uint32_t now_ms) {
+  const uint16_t spatial_step = 37;
+  const uint16_t temporal = (uint16_t)((now_ms * (uint32_t)s_noise_speed) / 8U);
+  for (uint16_t i = 0; i < SSC_LED_STRIP_LEN; i++) {
+    const uint8_t noise = inoise8((uint16_t)(i * spatial_step), temporal);
+    const uint8_t scaled_noise = scale8(noise, s_noise_amplitude_max);
+    const uint8_t shimmer = (uint8_t)random8(0, 12);
+    const uint8_t brightness = (uint8_t)min(255, (int)s_noise_base_min + (int)scaled_noise + (int)shimmer);
+    s_leds[strip_index][i] = apply_brightness(base, brightness);
+  }
+}
+
 static void render_strip(uint8_t strip_index, uint32_t now_ms) {
   const CRGB base = strip_base_color(strip_index);
   const CRGB error_color = CRGB(64, 0, 0);
@@ -347,6 +377,9 @@ static void render_strip(uint8_t strip_index, uint32_t now_ms) {
       break;
     case LEDSCENE_RANDOM_LONG_BLINK_THEN_ON:
       paint_strip_random_long_blink_then_on(strip_index, base, now_ms);
+      break;
+    case LEDSCENE_NOISE_FLAME:
+      paint_strip_noise_flame(strip_index, base, now_ms);
       break;
     case LEDSCENE_CRASH:
       paint_strip_crash_global_random_then_on(strip_index, base, now_ms);

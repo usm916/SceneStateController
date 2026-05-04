@@ -19,6 +19,7 @@ enum LedStripScene : uint8_t {
   LEDSCENE_CHASE,
   LEDSCENE_BLINK,
   LEDSCENE_RANDOM_LONG_BLINK_THEN_ON,
+  LEDSCENE_NOISE_FLAME,
   LEDSCENE_CRASH,
   LEDSCENE_EMERGENCY_RED,
   LEDSCENE_BLACKOUT,
@@ -29,6 +30,8 @@ enum LedStripScene : uint8_t {
 void led_setup();
 void led_set_pattern(LedPattern p, bool force_reset = false);
 void led_set_strip_scene(uint8_t strip_index, LedStripScene scene);
+bool led_set_noise_params(uint8_t base_min, uint8_t amplitude_max, uint8_t speed);
+void led_get_noise_params(uint8_t* out_base_min, uint8_t* out_amplitude_max, uint8_t* out_speed);
 bool led_set_global_brightness_pct(uint8_t brightness_pct);
 uint8_t led_global_brightness_pct();
 void led_load_saved_brightness();

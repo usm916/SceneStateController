@@ -52,7 +52,7 @@
 #define SSC_SWITCH_BUTTON_CODE_3 0x42  // BTN_7 (all strips CRASH)
 #endif
 #ifndef SSC_SWITCH_BUTTON_CODE_4
-#define SSC_SWITCH_BUTTON_CODE_4 0x52  // BTN_8 (all strips SOLID)
+#define SSC_SWITCH_BUTTON_CODE_4 0x52  // BTN_8 (all strips NOISE)
 #endif
 #ifndef SSC_SWITCH_BUTTON_CODE_5
 #define SSC_SWITCH_BUTTON_CODE_5 0xFF  // BTN_NONE (spare)
@@ -173,12 +173,12 @@ struct SscRgbColor
 };
 
 constexpr SscRgbColor SSC_LED_STRIP_BASE_COLORS[SSC_LED_STRIP_COUNT] = {
-  {56, 32, 32},  // strip 0 (warm white red tint)
-  {32, 56, 32},  // strip 1 (warm white green tint)
-  {32, 32, 56},  // strip 2 (cool white blue tint)
-  {56, 48, 32},  // strip 3 (warm amber-ish white)
-  {48, 32, 56},  // strip 4 (violet-ish white)
-  {32, 52, 52},  // strip 5 (cyan-ish white)
+  {192, 225, 255},  // strip 0
+  {192, 225, 255},  // strip 1
+  {192, 225, 255},  // strip 2
+  {192, 225, 255},  // strip 3
+  {192, 225, 255},  // strip 4
+  {192, 225, 255},  // strip 5
 };
 static_assert(sizeof(SSC_LED_STRIP_BASE_COLORS) / sizeof(SSC_LED_STRIP_BASE_COLORS[0]) == SSC_LED_STRIP_COUNT,
               "SSC_LED_STRIP_BASE_COLORS count mismatch");
