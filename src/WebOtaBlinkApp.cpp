@@ -628,6 +628,28 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
     request->send(400, "text/plain; charset=utf-8", "brightness_pct must be 0..100");
     return;
   }
+  int32_t noiseBaseMin = -1;
+  int32_t noiseAmplitudeMax = -1;
+  int32_t noiseSpeed = -1;
+  const bool hasNoiseBase = parseIntParam(request, "noise_base_min", &noiseBaseMin);
+  const bool hasNoiseAmp = parseIntParam(request, "noise_amplitude_max", &noiseAmplitudeMax);
+  const bool hasNoiseSpeed = parseIntParam(request, "noise_speed", &noiseSpeed);
+  if (hasNoiseBase || hasNoiseAmp || hasNoiseSpeed) {
+    if (!hasNoiseBase || !hasNoiseAmp || !hasNoiseSpeed ||
+        noiseBaseMin < 0 || noiseBaseMin > 255 ||
+        noiseAmplitudeMax < 0 || noiseAmplitudeMax > 255 ||
+        noiseSpeed <= 0 || noiseSpeed > 255 ||
+        (noiseBaseMin + noiseAmplitudeMax) > 255) {
+      request->send(400, "text/plain; charset=utf-8", "noise params invalid (base/amp:0..255, speed:1..255, base+amp<=255)");
+      return;
+    }
+    if (!led_set_noise_params((uint8_t)noiseBaseMin, (uint8_t)noiseAmplitudeMax, (uint8_t)noiseSpeed)) {
+      request->send(400, "text/plain; charset=utf-8", "noise params invalid");
+      return;
+    }
+    request->send(200, "text/plain; charset=utf-8", "noise params updated");
+    return;
+  }
 
   int32_t pattern = -1;
   if (parseIntParam(request, "pattern", &pattern)) {
@@ -689,6 +711,8 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
     scene = LEDSCENE_BLINK;
   } else if (value == "RANDOM") {
     scene = LEDSCENE_RANDOM_LONG_BLINK_THEN_ON;
+  } else if (value == "NOISE") {
+    scene = LEDSCENE_NOISE_FLAME;
   } else if (value == "CRASH") {
     scene = LEDSCENE_CRASH;
   } else if (value == "EMERGENCY") {
@@ -701,7 +725,7 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
     scene = LEDSCENE_FADE_OUT_3S;
   } else {
     request->send(400, "text/plain; charset=utf-8",
-                  "scene must be SOLID/CHASE/BLINK/RANDOM/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
+                  "scene must be SOLID/CHASE/BLINK/RANDOM/NOISE/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
     return;
   }
 
@@ -1400,6 +1424,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<button type='button' onclick=\"setStripSceneAll('CHASE')\">CHASE</button> ";
   html += "<button type='button' onclick=\"setStripSceneAll('BLINK')\">BLINK</button> ";
   html += "<button type='button' onclick=\"setStripSceneAll('RANDOM')\">RANDOM</button> ";
+  html += "<button type='button' onclick=\"setStripSceneAll('NOISE')\">NOISE</button> ";
   html += "<button type='button' onclick=\"setStripSceneAll('CRASH')\">CRASH</button> ";
   html += "<button type='button' onclick=\"setStripSceneAll('EMERGENCY')\">EMERGENCY</button> ";
   html += "<button type='button' onclick=\"setStripSceneAll('BLACKOUT')\">BLACKOUT</button> ";
@@ -1425,6 +1450,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<option value='CHASE'>CHASE</option>";
   html += "<option value='BLINK'>BLINK</option>";
   html += "<option value='RANDOM'>RANDOM</option>";
+  html += "<option value='NOISE'>NOISE</option>";
   html += "<option value='CRASH'>CRASH</option>";
   html += "<option value='EMERGENCY'>EMERGENCY</option>";
   html += "<option value='BLACKOUT'>BLACKOUT</option>";
@@ -1432,8 +1458,25 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<option value='FADEOUT3S'>FADEOUT3S</option>";
   html += "</select>";
   html += "<button type='button' onclick='setStripScene()'>Apply strip scene</button>";
+  uint8_t noiseBaseMin = 0;
+  uint8_t noiseAmplitudeMax = 0;
+  uint8_t noiseSpeed = 0;
+  led_get_noise_params(&noiseBaseMin, &noiseAmplitudeMax, &noiseSpeed);
+  html += "<label for='noise-base-min'>Noise base(min)</label>";
+  html += "<input id='noise-base-min' type='number' min='0' max='255' value='";
+  html += String(noiseBaseMin);
+  html += "'>";
+  html += "<label for='noise-amplitude-max'>Noise amp(max)</label>";
+  html += "<input id='noise-amplitude-max' type='number' min='0' max='255' value='";
+  html += String(noiseAmplitudeMax);
+  html += "'>";
+  html += "<label for='noise-speed'>Noise speed</label>";
+  html += "<input id='noise-speed' type='number' min='1' max='255' value='";
+  html += String(noiseSpeed);
+  html += "'>";
+  html += "<button type='button' onclick='setNoiseParams()'>Apply noise</button>";
   html += "</div>";
-  html += "<p class='small'>Serial command: LEDSCENE &lt;0..5|ALL&gt; &lt;SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S&gt;</p>";
+  html += "<p class='small'>Serial command: LEDSCENE &lt;0..5|ALL&gt; &lt;SOLID|CHASE|BLINK|RANDOM|NOISE|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S&gt;</p>";
   html += "<p class='small'>Serial brightness command: brightness_&lt;0..100&gt;</p>";
   html += "</div>";
 
@@ -1496,6 +1539,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "async function setLedPattern(pattern){try{const r=await postForm('/led-control',{pattern:String(pattern)});const t=await r.text();setLedStatus((r.ok?('Pattern set: '+pattern):('Pattern failed: '+t)),!r.ok);}catch(e){setLedStatus('Pattern failed: '+e,true);}}";
   html += "async function setStripSceneAll(scene){try{const r=await postForm('/led-control',{strip:'ALL',scene:scene});const t=await r.text();setLedStatus((r.ok?('All strips -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "async function setStripScene(){const strip=document.getElementById('led-strip').value;const scene=document.getElementById('led-scene').value;try{const r=await postForm('/led-control',{strip:strip,scene:scene});const t=await r.text();setLedStatus((r.ok?('Strip '+strip+' -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
+  html += "async function setNoiseParams(){const b=document.getElementById('noise-base-min').value;const a=document.getElementById('noise-amplitude-max').value;const s=document.getElementById('noise-speed').value;try{const r=await postForm('/led-control',{noise_base_min:String(b),noise_amplitude_max:String(a),noise_speed:String(s)});const t=await r.text();setLedStatus((r.ok?('Noise params updated (base='+b+', amp='+a+', speed='+s+')'):('Noise update failed: '+t)),!r.ok);}catch(e){setLedStatus('Noise update failed: '+e,true);}}";
   html += "async function setScene(){const scene=document.getElementById('scene-id').value;try{const r=await postForm('/scene-control',{scene:scene});const t=await r.text();setSceneStatus((r.ok?('Scene -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setSceneStatus('Scene failed: '+e,true);}}";
   html += "let runtimeModeMask=";
   html += String((int)runtime_mode_get());

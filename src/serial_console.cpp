@@ -74,6 +74,10 @@ bool parse_led_scene_token(const char* token, LedStripScene* out_scene) {
     *out_scene = LEDSCENE_RANDOM_LONG_BLINK_THEN_ON;
     return true;
   }
+  if (strcmp(token, "NOISE") == 0 || strcmp(token, "noise") == 0) {
+    *out_scene = LEDSCENE_NOISE_FLAME;
+    return true;
+  }
   if (strcmp(token, "CRASH") == 0 || strcmp(token, "crash") == 0) {
     *out_scene = LEDSCENE_CRASH;
     return true;
@@ -221,7 +225,7 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
     if (sscanf(line + 9, "%7s %15s", scope, sceneToken) == 2) {
       LedStripScene scene = LEDSCENE_SOLID;
       if (!parse_led_scene_token(sceneToken, &scene)) {
-        Serial.println("LEDSCENE scene must be SOLID/CHASE/BLINK/RANDOM/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
+        Serial.println("LEDSCENE scene must be SOLID/CHASE/BLINK/RANDOM/NOISE/CRASH/EMERGENCY/BLACKOUT/FADEIN3S/FADEOUT3S");
         return false;
       }
 
@@ -248,7 +252,7 @@ bool handle_serial_line(ConsoleLogger& log, const char* line, uint8_t len,
         return false;
       }
     }
-    Serial.println("LEDSCENE usage: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
+    Serial.println("LEDSCENE usage: LEDSCENE <0..5|ALL> <SOLID|CHASE|BLINK|RANDOM|NOISE|CRASH|EMERGENCY|BLACKOUT|FADEIN3S|FADEOUT3S>");
     return false;
   }
   if (len >= 7 && (strncmp(line, "SCENE ", 6) == 0 || strncmp(line, "scene ", 6) == 0)) {
