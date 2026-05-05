@@ -713,6 +713,45 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
     return;
   }
 
+  int32_t colorPresetIndex = -1;
+  if (parseIntParam(request, "color_preset_index", &colorPresetIndex)) {
+    if (colorPresetIndex < 0 || colorPresetIndex >= (int32_t)SSC_LED_STRIP_COLOR_PRESET_COUNT) {
+      request->send(400, "text/plain; charset=utf-8", "color_preset_index out of range");
+      return;
+    }
+    if (!request->hasParam("strip", true)) {
+      request->send(400, "text/plain; charset=utf-8", "missing strip");
+      return;
+    }
+    const AsyncWebParameter* colorStripParam = request->getParam("strip", true);
+    if (colorStripParam == nullptr) {
+      request->send(400, "text/plain; charset=utf-8", "invalid strip");
+      return;
+    }
+    const String stripValue = colorStripParam->value();
+    const bool applyAllStrips = (stripValue == "ALL" || stripValue == "all");
+    if (applyAllStrips) {
+      if (!led_set_all_strip_color_preset((uint8_t)colorPresetIndex)) {
+        request->send(400, "text/plain; charset=utf-8", "failed to set color preset");
+        return;
+      }
+      request->send(200, "text/plain; charset=utf-8", "all strip color presets updated");
+      return;
+    }
+    int32_t stripIndex = -1;
+    if (!parseIntParam(request, "strip", &stripIndex) ||
+        stripIndex < 0 || stripIndex >= SSC_LED_STRIP_COUNT) {
+      request->send(400, "text/plain; charset=utf-8", "strip must be 0..5 or ALL");
+      return;
+    }
+    if (!led_set_strip_color_preset((uint8_t)stripIndex, (uint8_t)colorPresetIndex)) {
+      request->send(400, "text/plain; charset=utf-8", "failed to set color preset");
+      return;
+    }
+    request->send(200, "text/plain; charset=utf-8", "strip color preset updated");
+    return;
+  }
+
   if (!request->hasParam("strip", true)) {
     request->send(400, "text/plain; charset=utf-8", "missing strip");
     return;
@@ -1529,6 +1568,19 @@ String WebOtaBlinkApp::makeHtml() const
   html += "<option value='FADEOUT3S'>FADEOUT3S</option>";
   html += "</select>";
   html += "<button type='button' onclick='setStripScene()'>Apply strip scene</button>";
+  html += "<label for='led-color-preset'>Color preset</label>";
+  html += "<select id='led-color-preset'>";
+  for (uint8_t i = 0; i < SSC_LED_STRIP_COLOR_PRESET_COUNT; ++i) {
+    html += "<option value='";
+    html += String(i);
+    html += "'";
+    if (i == led_strip_color_preset(0)) html += " selected";
+    html += ">";
+    html += htmlEscape(String(SSC_LED_STRIP_COLOR_PRESET_NAMES[i]));
+    html += "</option>";
+  }
+  html += "</select>";
+  html += "<button type='button' onclick='setStripColorPreset()'>Apply strip color</button>";
   uint8_t noiseBaseMin = 0;
   uint8_t noiseAmplitudeMax = 0;
   uint8_t noiseSpeed = 0;
@@ -1610,6 +1662,7 @@ String WebOtaBlinkApp::makeHtml() const
   html += "async function setLedPattern(pattern){try{const r=await postForm('/led-control',{pattern:String(pattern)});const t=await r.text();setLedStatus((r.ok?('Pattern set: '+pattern):('Pattern failed: '+t)),!r.ok);}catch(e){setLedStatus('Pattern failed: '+e,true);}}";
   html += "async function setStripSceneAll(scene){try{const r=await postForm('/led-control',{strip:'ALL',scene:scene});const t=await r.text();setLedStatus((r.ok?('All strips -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
   html += "async function setStripScene(){const strip=document.getElementById('led-strip').value;const scene=document.getElementById('led-scene').value;try{const r=await postForm('/led-control',{strip:strip,scene:scene});const t=await r.text();setLedStatus((r.ok?('Strip '+strip+' -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setLedStatus('Scene failed: '+e,true);}}";
+  html += "async function setStripColorPreset(){const strip=document.getElementById('led-strip').value;const preset=document.getElementById('led-color-preset').value;try{const r=await postForm('/led-control',{strip:strip,color_preset_index:String(preset)});const t=await r.text();setLedStatus((r.ok?('Strip '+strip+' color preset -> '+preset):('Color preset failed: '+t)),!r.ok);}catch(e){setLedStatus('Color preset failed: '+e,true);}}";
   html += "async function setNoiseParams(){const b=document.getElementById('noise-base-min').value;const a=document.getElementById('noise-amplitude-max').value;const s=document.getElementById('noise-speed').value;try{const r=await postForm('/led-control',{noise_base_min:String(b),noise_amplitude_max:String(a),noise_speed:String(s)});const t=await r.text();setLedStatus((r.ok?('Noise params updated (base='+b+', amp='+a+', speed='+s+')'):('Noise update failed: '+t)),!r.ok);}catch(e){setLedStatus('Noise update failed: '+e,true);}}";
   html += "async function setScene(){const scene=document.getElementById('scene-id').value;try{const r=await postForm('/scene-control',{scene:scene});const t=await r.text();setSceneStatus((r.ok?('Scene -> '+scene):('Scene failed: '+t)),!r.ok);}catch(e){setSceneStatus('Scene failed: '+e,true);}}";
   html += "let runtimeModeMask=";
