@@ -175,6 +175,7 @@ void led_setup() {
     add_strip_controller(strip);
     s_strip_scenes[strip] = LEDSCENE_BLACKOUT;
     s_chase_pos[strip] = 0;
+    s_strip_color_preset_index[strip] = 0;
   }
 
   FastLED.setBrightness(to_fastled_master_brightness(s_global_brightness_pct));
