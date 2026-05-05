@@ -735,6 +735,7 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
         request->send(400, "text/plain; charset=utf-8", "failed to set color preset");
         return;
       }
+      (void)led_save_strip_color_presets();
       request->send(200, "text/plain; charset=utf-8", "all strip color presets updated");
       return;
     }
@@ -748,6 +749,7 @@ void WebOtaBlinkApp::handleLedControl(AsyncWebServerRequest* request)
       request->send(400, "text/plain; charset=utf-8", "failed to set color preset");
       return;
     }
+    (void)led_save_strip_color_presets();
     request->send(200, "text/plain; charset=utf-8", "strip color preset updated");
     return;
   }

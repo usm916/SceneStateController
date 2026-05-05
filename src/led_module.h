@@ -46,6 +46,8 @@ bool led_save_noise_params();
 bool led_set_strip_color_preset(uint8_t strip_index, uint8_t preset_index);
 bool led_set_all_strip_color_preset(uint8_t preset_index);
 uint8_t led_strip_color_preset(uint8_t strip_index);
+void led_load_saved_strip_color_presets();
+bool led_save_strip_color_presets();
 void led_set_updates_enabled(bool enabled);
 bool led_updates_enabled();
 void led_tick(uint32_t now_ms);

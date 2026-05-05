@@ -62,6 +62,7 @@ static constexpr const char* kLedNoiseBaseMinKey = "noise_base";
 static constexpr const char* kLedNoiseAmplitudeMaxKey = "noise_amp";
 static constexpr const char* kLedNoiseSpeedKey = "noise_speed";
 static constexpr const char* kLedBaseColorCandidateIndexKey = "base_color_i";
+static constexpr const char* kLedStripColorPresetBlobKey = "strip_color_p";
 static uint32_t s_scene_start_ms[SSC_LED_STRIP_COUNT] = {0};
 static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{0}};
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
@@ -165,6 +166,10 @@ void led_setup() {
   led_load_saved_brightness();
   led_load_saved_noise_params();
   led_load_saved_base_color_candidate_index();
+  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
+    s_strip_color_preset_index[strip] = 0;
+  }
+  led_load_saved_strip_color_presets();
 
   for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
@@ -285,6 +290,31 @@ bool led_set_all_strip_color_preset(uint8_t preset_index) {
 uint8_t led_strip_color_preset(uint8_t strip_index) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return 0;
   return s_strip_color_preset_index[strip_index];
+}
+
+void led_load_saved_strip_color_presets() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, true)) return;
+  uint8_t saved[SSC_LED_STRIP_COUNT] = {0};
+  const size_t got = prefs.getBytes(kLedStripColorPresetBlobKey, saved, sizeof(saved));
+  prefs.end();
+  if (got != sizeof(saved)) return;
+  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
+    const uint8_t preset = saved[strip];
+    if (preset < SSC_LED_STRIP_COLOR_PRESET_COUNT) {
+      s_strip_color_preset_index[strip] = preset;
+    }
+  }
+}
+
+bool led_save_strip_color_presets() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, false)) return false;
+  const size_t written = prefs.putBytes(kLedStripColorPresetBlobKey,
+                                        s_strip_color_preset_index,
+                                        sizeof(s_strip_color_preset_index));
+  prefs.end();
+  return written == sizeof(s_strip_color_preset_index);
 }
 
 void led_set_updates_enabled(bool enabled) {
