@@ -62,6 +62,7 @@ static constexpr const char* kLedNoiseBaseMinKey = "noise_base";
 static constexpr const char* kLedNoiseAmplitudeMaxKey = "noise_amp";
 static constexpr const char* kLedNoiseSpeedKey = "noise_speed";
 static constexpr const char* kLedBaseColorCandidateIndexKey = "base_color_i";
+static constexpr const char* kLedStripColorPresetBlobKey = "strip_color_p";
 static uint32_t s_scene_start_ms[SSC_LED_STRIP_COUNT] = {0};
 static uint32_t s_random_next_toggle_ms[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{0}};
 static bool s_random_led_on[SSC_LED_STRIP_COUNT][SSC_LED_STRIP_LEN] = {{false}};
@@ -71,11 +72,17 @@ static uint8_t s_noise_base_min = 40;
 static uint8_t s_noise_amplitude_max = 80;
 static uint8_t s_noise_speed = 24;
 static uint8_t s_base_color_candidate_index = 0;
+static uint8_t s_strip_color_preset_index[SSC_LED_STRIP_COUNT] = {0};
 static constexpr uint8_t kColorGuardThreshold = 10;
 static constexpr uint8_t kColorGuardFloor = 6;
 
 static CRGB strip_base_color(uint8_t strip_index) {
   if (strip_index >= SSC_LED_STRIP_COUNT) return CRGB(16, 16, 16);
+  if (SSC_LED_STRIP_COLOR_PRESET_COUNT > 0) {
+    const uint8_t preset = s_strip_color_preset_index[strip_index] % SSC_LED_STRIP_COLOR_PRESET_COUNT;
+    const SscRgbColor& c = SSC_LED_STRIP_COLOR_PRESETS[preset];
+    return CRGB(c.r, c.g, c.b);
+  }
   if (SSC_LED_BASE_COLOR_CANDIDATE_COUNT > 0) {
     const SscRgbColor& c = SSC_LED_BASE_COLOR_CANDIDATES[s_base_color_candidate_index];
     return CRGB(c.r, c.g, c.b);
@@ -159,6 +166,10 @@ void led_setup() {
   led_load_saved_brightness();
   led_load_saved_noise_params();
   led_load_saved_base_color_candidate_index();
+  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
+    s_strip_color_preset_index[strip] = 0;
+  }
+  led_load_saved_strip_color_presets();
 
   for (uint8_t strip = 0; strip < SSC_LED_ACTIVE_STRIP_COUNT; strip++) {
     add_strip_controller(strip);
@@ -258,6 +269,51 @@ bool led_save_noise_params() {
   const size_t speedWritten = prefs.putUChar(kLedNoiseSpeedKey, s_noise_speed);
   prefs.end();
   return baseWritten > 0 && ampWritten > 0 && speedWritten > 0;
+}
+
+bool led_set_strip_color_preset(uint8_t strip_index, uint8_t preset_index) {
+  if (strip_index >= SSC_LED_STRIP_COUNT) return false;
+  if (preset_index >= SSC_LED_STRIP_COLOR_PRESET_COUNT) return false;
+  s_strip_color_preset_index[strip_index] = preset_index;
+  return true;
+}
+
+bool led_set_all_strip_color_preset(uint8_t preset_index) {
+  if (preset_index >= SSC_LED_STRIP_COLOR_PRESET_COUNT) return false;
+  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
+    s_strip_color_preset_index[strip] = preset_index;
+  }
+  return true;
+}
+
+uint8_t led_strip_color_preset(uint8_t strip_index) {
+  if (strip_index >= SSC_LED_STRIP_COUNT) return 0;
+  return s_strip_color_preset_index[strip_index];
+}
+
+void led_load_saved_strip_color_presets() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, true)) return;
+  uint8_t saved[SSC_LED_STRIP_COUNT] = {0};
+  const size_t got = prefs.getBytes(kLedStripColorPresetBlobKey, saved, sizeof(saved));
+  prefs.end();
+  if (got != sizeof(saved)) return;
+  for (uint8_t strip = 0; strip < SSC_LED_STRIP_COUNT; ++strip) {
+    const uint8_t preset = saved[strip];
+    if (preset < SSC_LED_STRIP_COLOR_PRESET_COUNT) {
+      s_strip_color_preset_index[strip] = preset;
+    }
+  }
+}
+
+bool led_save_strip_color_presets() {
+  Preferences prefs;
+  if (!prefs.begin(kLedPrefsNamespace, false)) return false;
+  const size_t written = prefs.putBytes(kLedStripColorPresetBlobKey,
+                                        s_strip_color_preset_index,
+                                        sizeof(s_strip_color_preset_index));
+  prefs.end();
+  return written == sizeof(s_strip_color_preset_index);
 }
 
 void led_set_updates_enabled(bool enabled) {

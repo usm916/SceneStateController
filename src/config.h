@@ -195,6 +195,30 @@ constexpr size_t SSC_LED_BASE_COLOR_CANDIDATE_COUNT =
     sizeof(SSC_LED_BASE_COLOR_CANDIDATES) / sizeof(SSC_LED_BASE_COLOR_CANDIDATES[0]);
 static_assert(SSC_LED_BASE_COLOR_CANDIDATE_COUNT > 0, "SSC_LED_BASE_COLOR_CANDIDATES must not be empty");
 
+// Strip color presets used by web UI and per-strip assignment.
+constexpr SscRgbColor SSC_LED_STRIP_COLOR_PRESETS[] = {
+  {192, 225, 255},  // Icy White
+  {255, 170, 64},   // Amber
+  {120, 255, 160},  // Mint
+  {220, 140, 255},  // Violet
+  {255, 80, 80},    // Rose Red
+  {96, 176, 255},   // Sky Blue
+};
+constexpr const char* SSC_LED_STRIP_COLOR_PRESET_NAMES[] = {
+  "Icy White",
+  "Amber",
+  "Mint",
+  "Violet",
+  "Rose Red",
+  "Sky Blue",
+};
+constexpr size_t SSC_LED_STRIP_COLOR_PRESET_COUNT =
+    sizeof(SSC_LED_STRIP_COLOR_PRESETS) / sizeof(SSC_LED_STRIP_COLOR_PRESETS[0]);
+static_assert(SSC_LED_STRIP_COLOR_PRESET_COUNT > 0, "SSC_LED_STRIP_COLOR_PRESETS must not be empty");
+static_assert(SSC_LED_STRIP_COLOR_PRESET_COUNT ==
+                  (sizeof(SSC_LED_STRIP_COLOR_PRESET_NAMES) / sizeof(SSC_LED_STRIP_COLOR_PRESET_NAMES[0])),
+              "SSC_LED_STRIP_COLOR_PRESET_NAMES count mismatch");
+
 constexpr size_t SSC_WEB_REMOTE_BUTTON_COUNT = 21;
 
 constexpr const char* SSC_WEB_REMOTE_BUTTON_KEYS[SSC_WEB_REMOTE_BUTTON_COUNT] = {
