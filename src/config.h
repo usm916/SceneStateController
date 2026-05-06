@@ -216,6 +216,11 @@ constexpr const char* SSC_LED_STRIP_COLOR_PRESET_NAMES[] = {
   "Violet",
   "Rose Red",
   "Sky Blue",
+  "Yellow",
+  "Orange",
+  "Green",
+  "Red",
+  "Blue",
 };
 constexpr size_t SSC_LED_STRIP_COLOR_PRESET_COUNT =
     sizeof(SSC_LED_STRIP_COLOR_PRESETS) / sizeof(SSC_LED_STRIP_COLOR_PRESETS[0]);
