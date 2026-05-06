@@ -198,11 +198,16 @@ static_assert(SSC_LED_BASE_COLOR_CANDIDATE_COUNT > 0, "SSC_LED_BASE_COLOR_CANDID
 // Strip color presets used by web UI and per-strip assignment.
 constexpr SscRgbColor SSC_LED_STRIP_COLOR_PRESETS[] = {
   {192, 225, 255},  // Icy White
-  {255, 170, 64},   // Amber
+  {255, 150, 48},   // Amber
   {120, 255, 160},  // Mint
   {220, 140, 255},  // Violet
   {255, 80, 80},    // Rose Red
   {96, 176, 255},   // Sky Blue
+  {255, 255, 32},    // Yellow
+  {255, 165, 32},    // Orange
+  {32, 255, 32},    // Green
+  {255, 24, 24},   // Red
+  {24, 24, 255},   // Blue
 };
 constexpr const char* SSC_LED_STRIP_COLOR_PRESET_NAMES[] = {
   "Icy White",
