@@ -68,9 +68,12 @@
 #define SSC_TMC_UART_RX_PIN  16
 #define SSC_TMC_UART_TX_PIN  17
 
-#define SSC_PIN_ENDSTOP_UP    25
-#define SSC_PIN_ENDSTOP_MID   34
-#define SSC_PIN_ENDSTOP_DOWN  13
+// #define SSC_PIN_ENDSTOP_UP    25
+// #define SSC_PIN_ENDSTOP_MID   34
+// #define SSC_PIN_ENDSTOP_DOWN  13
+#define SSC_PIN_ENDSTOP_UP    36
+#define SSC_PIN_ENDSTOP_MID   39
+#define SSC_PIN_ENDSTOP_DOWN  35
 
 // Endstop input mode:
 // 1: INPUT_PULLUP + active LOW switch (default)
