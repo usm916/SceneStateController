@@ -73,7 +73,7 @@
 // #define SSC_PIN_ENDSTOP_DOWN  13
 #define SSC_PIN_ENDSTOP_UP    36
 #define SSC_PIN_ENDSTOP_MID   39
-#define SSC_PIN_ENDSTOP_DOWN  35
+#define SSC_PIN_ENDSTOP_DOWN  34
 
 // Endstop input mode:
 // 1: INPUT_PULLUP + active LOW switch (default)
