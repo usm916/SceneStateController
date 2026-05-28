@@ -91,7 +91,9 @@ bool endstop_hit_down_no_pullup() {
 }
 
 bool endstop_hit_up() {
-#if SSC_ENDSTOP_USE_INPUT_PULLUP
+#if !SSC_ENDSTOP_SENSING_ENABLE
+  return false;
+#elif SSC_ENDSTOP_USE_INPUT_PULLUP
   return digitalRead(SSC_PIN_ENDSTOP_UP) == LOW;
 #else
   return endstop_hit_up_no_pullup();
@@ -99,7 +101,9 @@ bool endstop_hit_up() {
 }
 
 bool endstop_hit_down() {
-#if SSC_ENDSTOP_USE_INPUT_PULLUP
+#if !SSC_ENDSTOP_SENSING_ENABLE
+  return false;
+#elif SSC_ENDSTOP_USE_INPUT_PULLUP
   return digitalRead(SSC_PIN_ENDSTOP_DOWN) == LOW;
 #else
   return endstop_hit_down_no_pullup();
@@ -385,7 +389,9 @@ void elevator_setup() {
   digitalWrite(SSC_PIN_STEP, LOW);
   digitalWrite(SSC_PIN_DIR, LOW);
 
-#if SSC_ENDSTOP_USE_INPUT_PULLUP
+#if !SSC_ENDSTOP_SENSING_ENABLE
+  Serial.println("Endstop input setup skipped (SSC_ENDSTOP_SENSING_ENABLE=0)");
+#elif SSC_ENDSTOP_USE_INPUT_PULLUP
   pinMode(SSC_PIN_ENDSTOP_UP, INPUT_PULLUP);
   pinMode(SSC_PIN_ENDSTOP_DOWN, INPUT_PULLUP);
 #else
