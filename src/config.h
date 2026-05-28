@@ -120,7 +120,7 @@
 #endif
 
 #ifndef SSC_ENDSTOP_SENSING_ENABLE
-#define SSC_ENDSTOP_SENSING_ENABLE 1
+#define SSC_ENDSTOP_SENSING_ENABLE 0
 #endif
 
 #ifndef SSC_IR_RECEIVER_ENABLE
@@ -128,7 +128,7 @@
 #endif
 
 #ifndef SSC_IR_LOG_ENABLE
-#define SSC_IR_LOG_ENABLE 1
+#define SSC_IR_LOG_ENABLE 0
 #endif
 
 #ifndef SSC_USB_SERIAL_BAUD
