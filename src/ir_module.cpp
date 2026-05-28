@@ -74,6 +74,10 @@ void ir_set_decode_mode(uint8_t mode) {
 }
 
 void ir_setup() {
+#if !SSC_IR_RECEIVER_ENABLE
+  Serial.println("IR setup skipped (SSC_IR_RECEIVER_ENABLE=0)");
+  return;
+#endif
   IrReceiver.begin(SSC_PIN_IR, DISABLE_LED_FEEDBACK);
   Serial.println();
   Serial.println("===== ESP32 IR Debug Boot =====");
@@ -88,6 +92,10 @@ void ir_setup() {
 
 bool ir_poll(Event& out) {
   update_button_lifecycle(millis());
+#if !SSC_IR_RECEIVER_ENABLE
+  (void)out;
+  return false;
+#endif
   if (!IrReceiver.decode()) return false;
 
   auto &d = IrReceiver.decodedIRData;

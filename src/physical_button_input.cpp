@@ -80,7 +80,9 @@ void log_switch_transition(uint32_t now_ms,
 }  // namespace
 
 bool physical_button_input_enabled() {
-#if SSC_LED_PIN_MODE == SSC_LED_PIN_MODE_SWITCH
+#if !SSC_EV_BUTTON_INPUT_ENABLE
+  return false;
+#elif SSC_LED_PIN_MODE == SSC_LED_PIN_MODE_SWITCH
   return true;
 #else
   return (runtime_mode_get() & RUNTIME_MODE_LED) == 0;

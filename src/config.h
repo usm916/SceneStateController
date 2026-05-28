@@ -110,6 +110,23 @@
 #define SSC_MODE 0
 #endif
 
+
+// Sensor input toggles (compile-time)
+// - EV button: physical button pins -> IR button injection
+// - Endstop sensing: elevator endstop pin reads/setup
+// - IR: IR receiver setup/poll
+#ifndef SSC_EV_BUTTON_INPUT_ENABLE
+#define SSC_EV_BUTTON_INPUT_ENABLE 1
+#endif
+
+#ifndef SSC_ENDSTOP_SENSING_ENABLE
+#define SSC_ENDSTOP_SENSING_ENABLE 1
+#endif
+
+#ifndef SSC_IR_RECEIVER_ENABLE
+#define SSC_IR_RECEIVER_ENABLE 1
+#endif
+
 #ifndef SSC_IR_LOG_ENABLE
 #define SSC_IR_LOG_ENABLE 1
 #endif
