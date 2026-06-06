@@ -15,6 +15,7 @@ class ConsoleLogger {
   void print_serial_echo(char c);
   void print_mode_usage();
   void print_mode_cmd_too_long();
+  void print_unrecognized_line(const char* line);
   void print_startup(uint8_t mode);
 
 #if SSC_IR_LOG_ENABLE
